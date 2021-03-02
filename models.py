@@ -27,7 +27,7 @@ class ContrastiveLoss(nn.Module):
 class TextSentiment(nn.Module):
     def __init__(self, vocab_size, embed_dim):
         super().__init__()
-        self.embedding = nn.EmbeddingBag(vocab_size, embed_dim, sparse=True)
+        self.embedding = nn.EmbeddingBag(vocab_size, embed_dim, sparse=False)
         self.hidden = nn.LSTM(embed_dim, embed_dim, 4)
         self.fc = nn.Linear(embed_dim, 1)
         self.init_weights()

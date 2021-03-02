@@ -3,6 +3,7 @@ from torchtext.vocab import Vocab, Counter
 import os
 import json
 import torch
+from nltk.corpus import wordnet as wn
 
 
 def generate_batch(batch):
@@ -23,29 +24,25 @@ def generate_batch(batch):
 
 
 class WordDataset(Dataset):
-    def __init__(self, json_path='/home/palm/PycharmProjects/wordset-dictionary/data/'):
-        self.json_path = json_path
+    def __init__(self):
+        self.words = list(set(i for i in wn.words()))
         counter = Counter()
-        self.data = []
-        for file in os.listdir(json_path):
-            data = json.load(open(os.path.join(json_path, file)))
-            for key in data:
-                word = data[key]
-                counter.update([key])
-                if 'meanings' in word:
-                    self.data.append(word)
-                    for meaning in word['meanings']:
-                        counter.update(meaning['def'].split(' '))
+        for word in self.words:
+            counter.update([word])
+            word = wn.synsets(word)
+            for meaning in word:
+                counter.update(meaning.definition())
         self.vocab = Vocab(counter)
 
     def __len__(self):
-        return len(self.data)
+        return len(self.words)
 
     def __getitem__(self, index):
-        data = self.data[index]
+        word = self.words[index]
+        data = wn.synsets(word)
         diff = torch.rand(1)[0] > 0.5
         if not diff:
-            tokens = data['meanings'][0]['def'].split(' ')
+            tokens = data[0].definition()
             token_ids = list(filter(lambda x: x is not Vocab.UNK, [self.vocab[token]
                                                                    for token in tokens]))
         else:
@@ -53,13 +50,13 @@ class WordDataset(Dataset):
                 idx = torch.randint(0, len(self), (1, ))
                 if idx != index:
                     break
-            diff_data = self.data[idx]
-            tokens = diff_data['meanings'][0]['def'].split(' ')
+            diff_data = wn.synsets(self.words[idx])
+            tokens = diff_data[0].definition()
             token_ids = list(filter(lambda x: x is not Vocab.UNK, [self.vocab[token]
                                                                    for token in tokens]))
 
         tokens = torch.tensor(token_ids)
-        word = torch.tensor([self.vocab[data['word']]])
+        word = torch.tensor([self.vocab[word]])
         return tokens, word, diff
 
 

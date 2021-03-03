@@ -29,17 +29,16 @@ if __name__ == '__main__':
                                                     collate_fn=generate_batch)
     model = TextSentiment(len(dataset.vocab), 1024)
     model.to(device)
-    optimizer = torch.optim.Adam(model.parameters(),
-                                0.01, )
-    schedule = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer)
+    optimizer = torch.optim.Adam(model.parameters(), 0.01)
+    schedule = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=3)
     criterion = ContrastiveLoss()
     for epoch in range(30):
         print('Epoch:', epoch + 1)
         model.train()
         progbar = tf.keras.utils.Progbar(len(train_loader))
-        for idx, (text, text_offsets, word, word_offsets, label) in enumerate(train_loader):
-            y_text = model(text.to(device), text_offsets.to(device))
-            y_word = model(word.to(device), word_offsets.to(device))
+        for idx, (text, word, label) in enumerate(train_loader):
+            y_text = model(text.to(device))
+            y_word = model(word.to(device))
             loss = criterion(y_text, y_word, label.to(device))
             loss.backward()
             optimizer.step()
@@ -50,9 +49,9 @@ if __name__ == '__main__':
         progbar = tf.keras.utils.Progbar(len(validation_loader))
         min_loss = 100
         with torch.no_grad():
-            for idx, (text, text_offsets, word, word_offsets, label) in enumerate(validation_loader):
-                y_text = model(text.to(device), text_offsets.to(device))
-                y_word = model(word.to(device), word_offsets.to(device))
+            for idx, (text, word, label) in enumerate(validation_loader):
+                y_text = model(text.to(device))
+                y_word = model(word.to(device))
                 loss = criterion(y_text, y_word, label.to(device))
                 progbar.update(idx + 1, [('val_loss', loss.detach().item())])
         if progbar._values['val_loss'][0]/progbar._values['val_loss'][1] < min_loss:

@@ -4,6 +4,9 @@ import os
 import json
 import torch
 from nltk.corpus import wordnet as wn
+from torch.nn.utils.rnn import pad_sequence
+from torch.utils.data.sampler import SubsetRandomSampler
+import numpy as np
 
 
 def generate_batch(batch):
@@ -12,15 +15,9 @@ def generate_batch(batch):
     word = [entry[1] for entry in batch]
     text_offsets = [0] + [len(entry) for entry in text]
     word_offsets = [0] + [len(entry) for entry in word]
-    # torch.Tensor.cumsum returns the cumulative sum
-    # of elements in the dimension dim.
-    # torch.Tensor([1.0, 2.0, 3.0]).cumsum(dim=0)
-
-    text_offsets = torch.tensor(text_offsets[:-1]).cumsum(dim=0)
-    word_offsets = torch.tensor(word_offsets[:-1]).cumsum(dim=0)
-    text = torch.cat(text)
-    word = torch.cat(word)
-    return text, text_offsets, word, word_offsets, label
+    text = pad_sequence(text)
+    word = pad_sequence(word)
+    return text, word, label
 
 
 class WordDataset(Dataset):
@@ -61,5 +58,28 @@ class WordDataset(Dataset):
 
 
 if __name__ == '__main__':
-    t = WordDataset()
-    t[0]
+    dataset = WordDataset()
+    dataset_size = len(dataset)
+    indices = list(range(dataset_size))
+    split = int(np.floor(0.2 * dataset_size))
+    np.random.seed(88)
+    np.random.shuffle(indices)
+    train_indices, val_indices = indices[split:], indices[:split]
+
+    train_sampler = SubsetRandomSampler(train_indices)
+    valid_sampler = SubsetRandomSampler(val_indices)
+
+    train_loader = torch.utils.data.DataLoader(dataset, batch_size=32,
+                                               sampler=train_sampler,
+                                               num_workers=1,
+                                               collate_fn=generate_batch)
+    validation_loader = torch.utils.data.DataLoader(dataset, batch_size=32,
+                                                    sampler=valid_sampler,
+                                                    num_workers=1,
+                                                    collate_fn=generate_batch)
+    for idx, _ in enumerate(train_loader):
+        pass
+    print(idx)
+    for idx, _ in enumerate(validation_loader):
+        pass
+    print(idx)

@@ -27,9 +27,10 @@ class ContrastiveLoss(nn.Module):
 class TextSentiment(nn.Module):
     def __init__(self, vocab_size, embed_dim):
         super().__init__()
-        self.embedding = nn.EmbeddingBag(vocab_size, embed_dim, sparse=False)
+        self.embedding = nn.Embedding(vocab_size, embed_dim, sparse=True)
         self.hidden = nn.LSTM(embed_dim, embed_dim, 4)
         self.fc = nn.Linear(embed_dim, 1)
+        # self.fc2 = nn.Linear(1024, 1)
         self.init_weights()
 
     def init_weights(self):
@@ -38,10 +39,12 @@ class TextSentiment(nn.Module):
         self.fc.weight.data.uniform_(-initrange, initrange)
         self.fc.bias.data.zero_()
 
-    def forward(self, text, offsets):
-        embedded = self.embedding(text, offsets)
-        x = self.hidden(embedded.view(len(embedded), 1, -1))[0]
-        x = self.fc(x.view(x.size(0), x.size(2)))
+    def forward(self, text):
+        embedded = self.embedding(text)
+        x = self.hidden(embedded)[0][:, -1, :]
+        # x = self.fc(x.view(x.size(1), x.size(2)))
+        x = self.fc(embedded)
+        # x = self.fc2(x)
         return x
 
 
@@ -54,7 +57,8 @@ if __name__ == '__main__':
                       collate_fn=generate_batch)
 
     model = TextSentiment(len(datagen.vocab), 1024)
-    for text, text_offsets, word, word_offsets, label in data:
-        y = model(text, text_offsets)
+    with torch.no_grad():
+        for text, text_offsets, word, word_offsets, label in data:
+            y = model(text, text_offsets)
     print()
 

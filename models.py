@@ -45,7 +45,7 @@ class TextSentiment(nn.Module):
         super().__init__()
         self.embedding = nn.Embedding(vocab_size, embed_dim, sparse=True)
         self.hidden = nn.LSTM(embed_dim, embed_dim, 2)
-        self.fc = nn.Linear(embed_dim, 128)
+        self.fc = nn.Linear(embed_dim, 2)
         # self.fc2 = nn.Linear(1024, 1)
         self.init_weights()
 

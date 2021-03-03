@@ -1,12 +1,11 @@
 from torch.utils.data import Dataset
 from torchtext.vocab import Vocab, Counter
-import os
-import json
 import torch
 from nltk.corpus import wordnet as wn
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data.sampler import SubsetRandomSampler
 import numpy as np
+import pandas as pd
 
 
 def generate_batch(batch):
@@ -30,6 +29,35 @@ def generate_triplet_batch(batch):
     return word, pos_text, neg_text
 
 
+class QuoraDataset(Dataset):
+    def __init__(self):
+        self.csv = pd.read_csv('/home/palm/PycharmProjects/quora_question_pair/train.csv')
+        self.csv.fillna('', inplace=True)
+        counter = Counter()
+        for _, row in self.csv.iterrows():
+            q1 = row['question1']
+            q2 = row['question2']
+            counter.update(q1.split(' '))
+            counter.update(q2.split(' '))
+        self.vocab = Vocab(counter)
+
+    def __len__(self):
+        return len(self.csv)
+
+    def __getitem__(self, index):
+        row = self.csv.iloc[index]
+        q1 = row['question1']
+        q2 = row['question2']
+        label = row['is_duplicate']
+        token_ids_1 = list(filter(lambda x: x is not Vocab.UNK, [self.vocab[token]
+                                                                 for token in q1.split(' ')]))
+        token_ids_2 = list(filter(lambda x: x is not Vocab.UNK, [self.vocab[token]
+                                                                 for token in q2.split(' ')]))
+        token1 = torch.tensor(token_ids_1)
+        token2 = torch.tensor(token_ids_2)
+        return token1, token2, torch.ones(1) - label
+
+
 class WordDataset(Dataset):
     def __init__(self):
         self.words = list(set(i for i in wn.words()))
@@ -38,7 +66,7 @@ class WordDataset(Dataset):
             counter.update([word])
             word = wn.synsets(word)
             for meaning in word:
-                counter.update(meaning.definition())
+                counter.update(meaning.definition().split(' '))
         self.vocab = Vocab(counter)
 
     def __len__(self):
@@ -51,7 +79,7 @@ class WordDataset(Dataset):
         if not diff:
             tokens = data[0].definition()
             token_ids = list(filter(lambda x: x is not Vocab.UNK, [self.vocab[token]
-                                                                   for token in tokens]))
+                                                                   for token in tokens.split(' ')]))
         else:
             while True:
                 idx = torch.randint(0, len(self), (1,))
@@ -60,7 +88,7 @@ class WordDataset(Dataset):
             diff_data = wn.synsets(self.words[idx])
             tokens = diff_data[0].definition()
             token_ids = list(filter(lambda x: x is not Vocab.UNK, [self.vocab[token]
-                                                                   for token in tokens]))
+                                                                   for token in tokens.split(' ')]))
 
         tokens = torch.tensor(token_ids)
         word = torch.tensor([self.vocab[word]])
@@ -73,7 +101,7 @@ class WordTriplet(WordDataset):
         data = wn.synsets(word)
         pos_tokens = data[0].definition()
         pos_token_ids = list(filter(lambda x: x is not Vocab.UNK, [self.vocab[token]
-                                                                   for token in pos_tokens]))
+                                                                   for token in pos_tokens.split(' ')]))
         while True:
             idx = torch.randint(0, len(self), (1,))
             if idx != index:
@@ -81,7 +109,7 @@ class WordTriplet(WordDataset):
         diff_data = wn.synsets(self.words[idx])
         neg_tokens = diff_data[0].definition()
         neg_token_ids = list(filter(lambda x: x is not Vocab.UNK, [self.vocab[token]
-                                                                   for token in neg_tokens]))
+                                                                   for token in neg_tokens.split(' ')]))
 
         neg_tokens = torch.tensor(neg_token_ids)
         pos_tokens = torch.tensor(pos_token_ids)
@@ -90,7 +118,8 @@ class WordTriplet(WordDataset):
 
 
 if __name__ == '__main__':
-    dataset = WordDataset()
+    dataset = WordTriplet()
+    dataset[0]
     dataset_size = len(dataset)
     indices = list(range(dataset_size))
     split = int(np.floor(0.2 * dataset_size))

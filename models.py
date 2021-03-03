@@ -28,8 +28,8 @@ class TextSentiment(nn.Module):
     def __init__(self, vocab_size, embed_dim):
         super().__init__()
         self.embedding = nn.Embedding(vocab_size, embed_dim, sparse=True)
-        self.hidden = nn.LSTM(embed_dim, embed_dim, 4)
-        self.fc = nn.Linear(embed_dim, 1)
+        self.hidden = nn.LSTM(embed_dim, embed_dim, 2)
+        self.fc = nn.Linear(embed_dim, 128)
         # self.fc2 = nn.Linear(1024, 1)
         self.init_weights()
 
@@ -41,11 +41,22 @@ class TextSentiment(nn.Module):
 
     def forward(self, text):
         embedded = self.embedding(text)
-        x = self.hidden(embedded)[0][:, -1, :]
+        x, (hn, cn) = self.hidden(embedded)  # (seq_len, batch, hidden_size)
+        x = x[-1, :, :]
         # x = self.fc(x.view(x.size(1), x.size(2)))
-        x = self.fc(embedded)
+        # x = self.fc(embedded)
+        x = self.fc(x)
+        print(x.size())
         # x = self.fc2(x)
         return x
+
+
+class TripletModel(nn.Module):
+    def __init__(self, vocab_size, embed_dim):
+        super().__init__()
+        self.embedding = nn.Embedding(vocab_size, embed_dim, sparse=True)
+        self.hidden = nn.LSTM(embed_dim, embed_dim, 2)
+        self.fc = nn.Linear(embed_dim, 128)
 
 
 if __name__ == '__main__':

@@ -6,6 +6,7 @@ import tensorflow as tf
 from torch.utils.data.sampler import SubsetRandomSampler
 import numpy as np
 
+
 if __name__ == '__main__':
     device = 'cuda'
     dataset = WordDataset()

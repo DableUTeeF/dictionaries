@@ -108,6 +108,9 @@ class WordDataset(Dataset):
     def __len__(self):
         return len(self.words)
 
+    def collate_fn(self, batch):
+        return generate_batch(batch)
+
     def __getitem__(self, index):
         word = self.words[index]
         data = wn.synsets(word)
@@ -151,6 +154,9 @@ class WordTriplet(WordDataset):
         pos_tokens = torch.tensor(pos_token_ids)
         word = torch.tensor([self.vocab[word]])
         return word, pos_tokens, neg_tokens
+
+    def collate_fn(self, batch):
+        return generate_triplet_batch(batch)
 
 
 if __name__ == '__main__':

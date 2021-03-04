@@ -31,7 +31,7 @@ def generate_triplet_batch(batch):
 
 class QuoraDataset(Dataset):
     def __init__(self):
-        self.csv = pd.read_csv('/home/palm/PycharmProjects/quora_question_pair/train.csv')
+        self.csv = pd.read_csv('train.csv')
         self.csv.fillna('', inplace=True)
         counter = Counter()
         for _, row in self.csv.iterrows():
@@ -56,6 +56,42 @@ class QuoraDataset(Dataset):
         token1 = torch.tensor(token_ids_1)
         token2 = torch.tensor(token_ids_2)
         return token1, token2, torch.ones(1) - label
+
+
+class SynonymsDataset(Dataset):
+    def __init__(self):
+        self.words = list(set(i for i in wn.words()))
+        counter = Counter()
+        for word in self.words:
+            counter.update([word])
+            word = wn.synsets(word)
+            for meaning in word:
+                counter.update(meaning.definition().split(' '))
+        self.vocab = Vocab(counter)
+
+    def __len__(self):
+        return len(self.vocab.itos) - 2
+
+    def __getitem__(self, index):
+        word = self.vocab.itos[index+2]
+        ss = wn.synsets(word)
+        lemmas = np.random.choice(ss).lemma_names()
+        if len(lemmas) > 1 and np.random.rand() > 0.5:
+            other = np.random.choice(lemmas)
+            label = torch.ones(1)
+        else:
+            possible_lemmas = []
+            for synset in ss:
+                possible_lemmas.extend(synset.lemma_names())
+            while True:
+                idx = torch.randint(0, len(self), (1,))
+                if self.vocab.itos[idx+2] not in possible_lemmas:
+                    break
+            other = self.vocab.itos[idx+2]
+            label = torch.zeros(1)
+        word = torch.tensor([self.vocab[word]])
+        other = torch.tensor([self.vocab[other]])
+        return word, other, label
 
 
 class WordDataset(Dataset):

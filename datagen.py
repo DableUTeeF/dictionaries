@@ -98,12 +98,15 @@ class WordDataset(Dataset):
     def __init__(self):
         self.words = list(set(i for i in wn.words()))
         counter = Counter()
+        self.max_len = 0
         for word in self.words:
             counter.update([word])
             word = wn.synsets(word)
             for meaning in word:
+                self.max_len = max(self.max_len, len(meaning.definition().split(' ')))
                 counter.update(meaning.definition().split(' '))
         self.vocab = Vocab(counter)
+        self.vocab_len = len(self.vocab)
 
     def __len__(self):
         return len(self.words)
@@ -151,9 +154,14 @@ class WordTriplet(WordDataset):
                                                                    for token in neg_tokens.split(' ')]))
 
         neg_tokens = torch.tensor(neg_token_ids)
+        neg_out = torch.zeros((self.max_len, ), dtype=torch.long)
+        neg_out[:neg_tokens.size(0)] = neg_tokens
         pos_tokens = torch.tensor(pos_token_ids)
-        word = torch.tensor([self.vocab[word]])
-        return word, pos_tokens, neg_tokens
+        pos_out = torch.zeros((self.max_len, ), dtype=torch.long)
+        pos_out[:pos_tokens.size(0)] = pos_tokens
+        word_out = torch.zeros((self.max_len, ), dtype=torch.long)
+        word_out[0] = self.vocab[word]
+        return word_out, pos_out, neg_out
 
     def collate_fn(self, batch):
         return generate_triplet_batch(batch)
@@ -161,7 +169,7 @@ class WordTriplet(WordDataset):
 
 if __name__ == '__main__':
     dataset = WordTriplet()
-    dataset[0]
+    x = dataset[0]
     dataset_size = len(dataset)
     indices = list(range(dataset_size))
     split = int(np.floor(0.2 * dataset_size))

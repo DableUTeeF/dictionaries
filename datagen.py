@@ -9,14 +9,11 @@ import pandas as pd
 
 
 def generate_batch(batch):
-    label = torch.tensor([entry[2].int() for entry in batch])
     text = [entry[0] for entry in batch]
     word = [entry[1] for entry in batch]
-    text_offsets = [0] + [len(entry) for entry in text]
-    word_offsets = [0] + [len(entry) for entry in word]
     text = pad_sequence(text)
     word = pad_sequence(word)
-    return text, word, label
+    return text, word
 
 
 def generate_triplet_batch(batch):
@@ -96,52 +93,44 @@ class SynonymsDataset(Dataset):
 
 class WordDataset(Dataset):
     def __init__(self):
-        self.words = list(set(i for i in wn.words()))
+        words = list(set(i for i in wn.words()))
         counter = Counter()
         self.max_len = 0
-        for word in self.words:
+        for word in words:
             counter.update([word])
             word = wn.synsets(word)
             for meaning in word:
                 self.max_len = max(self.max_len, len(meaning.definition().split(' ')))
                 counter.update(meaning.definition().split(' '))
-        self.vocab = Vocab(counter)
+        self.vocab = Vocab(counter, min_freq=5)
         self.vocab_len = len(self.vocab)
+        self.meanings = []
+        for word in words:
+            if counter[word] > 5:
+                self.meanings.extend([(word, i.definition()) for i in wn.synsets(word)])
 
     def __len__(self):
-        return len(self.words)
+        return len(self.meanings)
 
     def collate_fn(self, batch):
         return generate_batch(batch)
 
     def __getitem__(self, index):
-        word = self.words[index]
+        word, tokens = self.meanings[index]
         data = wn.synsets(word)
-        diff = torch.rand(1)[0] > 0.5
-        if not diff:
-            tokens = data[0].definition()
-            token_ids = list(filter(lambda x: x is not Vocab.UNK, [self.vocab[token]
-                                                                   for token in tokens.split(' ')]))
-        else:
-            while True:
-                idx = torch.randint(0, len(self), (1,))
-                if idx != index:
-                    break
-            diff_data = wn.synsets(self.words[idx])
-            tokens = diff_data[0].definition()
-            token_ids = list(filter(lambda x: x is not Vocab.UNK, [self.vocab[token]
+        token_ids = list(filter(lambda x: x is not Vocab.UNK, [self.vocab[token]
                                                                    for token in tokens.split(' ')]))
 
         tokens = torch.tensor(token_ids)
         word = torch.tensor([self.vocab[word]])
-        return tokens, word, diff
+        return word, tokens
 
 
 class WordTriplet(WordDataset):
     def __getitem__(self, index):
         word = self.words[index]
         data = wn.synsets(word)
-        pos_tokens = data[0].definition()
+        pos_tokens = np.random.choice(data).definition()
         pos_token_ids = list(filter(lambda x: x is not Vocab.UNK, [self.vocab[token]
                                                                    for token in pos_tokens.split(' ')]))
         while True:
@@ -154,14 +143,15 @@ class WordTriplet(WordDataset):
                                                                    for token in neg_tokens.split(' ')]))
 
         neg_tokens = torch.tensor(neg_token_ids)
+        pos_tokens = torch.tensor(pos_token_ids)
+        word = torch.tensor([self.vocab[word]])
         neg_out = torch.zeros((self.max_len, ), dtype=torch.long)
         neg_out[:neg_tokens.size(0)] = neg_tokens
-        pos_tokens = torch.tensor(pos_token_ids)
         pos_out = torch.zeros((self.max_len, ), dtype=torch.long)
         pos_out[:pos_tokens.size(0)] = pos_tokens
         word_out = torch.zeros((self.max_len, ), dtype=torch.long)
         word_out[0] = self.vocab[word]
-        return word_out, pos_out, neg_out
+        return word, pos_tokens, neg_tokens
 
     def collate_fn(self, batch):
         return generate_triplet_batch(batch)

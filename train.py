@@ -1,5 +1,5 @@
-from datagen import QuoraDataset, SynonymsDataset, WordTriplet
-from models import TextSentiment, ContrastiveLoss, AutoEncoder
+from datagen import QuoraDataset, SynonymsDataset, WordTriplet, WordDataset
+from models import TextSentiment, ContrastiveLoss, AutoEncoder, LSTM_AE
 from torch.utils.data import DataLoader
 import torch
 import tensorflow as tf
@@ -10,7 +10,7 @@ from sklearn.metrics import f1_score
 
 if __name__ == '__main__':
     device = 'cuda'
-    dataset = WordTriplet()
+    dataset = WordDataset()
     dataset_size = len(dataset)
     indices = list(range(dataset_size))
     split = int(np.floor(0.2 * dataset_size))
@@ -21,20 +21,20 @@ if __name__ == '__main__':
     train_sampler = SubsetRandomSampler(train_indices)
     valid_sampler = SubsetRandomSampler(val_indices)
 
-    train_loader = torch.utils.data.DataLoader(dataset, batch_size=16,
+    train_loader = torch.utils.data.DataLoader(dataset, batch_size=32,
                                                sampler=train_sampler,
                                                num_workers=1,
-                                               # collate_fn=dataset.collate_fn,
+                                               collate_fn=dataset.collate_fn,
                                                )
-    validation_loader = torch.utils.data.DataLoader(dataset, batch_size=16,
+    validation_loader = torch.utils.data.DataLoader(dataset, batch_size=32,
                                                     sampler=valid_sampler,
                                                     num_workers=1,
-                                                    # collate_fn=dataset.collate_fn,
+                                                    collate_fn=dataset.collate_fn,
                                                     )
-    model = AutoEncoder(dataset.vocab_len, 256)
+    model = AutoEncoder(dataset.vocab_len, 1024)
     model.to(device)
-    optimizer = torch.optim.SGD(model.parameters(), 0.01)
-    schedule = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=20)
+    optimizer = torch.optim.Adam(model.parameters(), 0.001)
+    schedule = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=10, min_lr=1e-6)
     criterion = torch.nn.BCEWithLogitsLoss()
     vocabs = dataset.vocab_len
     for epoch in range(200):
@@ -42,9 +42,9 @@ if __name__ == '__main__':
         model.train()
         progbar = tf.keras.utils.Progbar(len(train_loader),
                                          stateful_metrics=['current_loss'])
-        for idx, (word, pos_tokens, neg_tokens) in enumerate(train_loader):
+        for idx, (word, pos_tokens, ) in enumerate(train_loader):
             y_text = model(pos_tokens.to(device))
-            target = torch.nn.functional.one_hot(word, num_classes=vocabs).float()
+            target = torch.nn.functional.one_hot(word[0], num_classes=vocabs).float()
             loss = criterion(y_text, target.to(device))
             loss.backward()
             optimizer.step()
@@ -57,9 +57,9 @@ if __name__ == '__main__':
                                          stateful_metrics=['current_loss'])
         min_loss = 100
         with torch.no_grad():
-            for idx, (word, pos_tokens, neg_tokens) in enumerate(validation_loader):
+            for idx, (word, pos_tokens, ) in enumerate(validation_loader):
                 y_text = model(pos_tokens.to(device))
-                target = torch.nn.functional.one_hot(word, num_classes=vocabs).float()
+                target = torch.nn.functional.one_hot(word[0], num_classes=vocabs).float()
                 loss = criterion(y_text, target.to(device))
                 progbar.update(idx + 1, [('val_loss', loss.detach().item()),
                                          ('current_loss', loss.detach().item())])

@@ -85,10 +85,10 @@ class AutoEncoder(nn.Module):
         super().__init__()
         self.embed_dim = embed_dim
         self.vocab_size = vocab_size
-        self.embedding = nn.Embedding(vocab_size, embed_dim, sparse=True)
-        self.hidden = nn.LSTM(embed_dim, embed_dim, 2)
+        self.embedding = nn.Embedding(vocab_size, embed_dim, sparse=False)
+        self.hidden = nn.Linear(embed_dim, embed_dim)
         encoder_layers = nn.TransformerEncoderLayer(embed_dim, 2, transformer_dim, dropout=0.5)
-        self.transformer_encoder = nn.TransformerEncoder(encoder_layers, 2)
+        self.transformer_encoder = nn.TransformerEncoder(encoder_layers, 4)
         self.pos_encoder = PositionalEncoding(embed_dim, 0.5)
         self.init_weights()
 
@@ -103,10 +103,56 @@ class AutoEncoder(nn.Module):
 
     def forward(self, text):
         src = self.embedding(text) * math.sqrt(self.embed_dim)
+        # print(text.size())
         src = self.pos_encoder(src)
+        # print(src.size())
         text_mask = self.generate_square_subsequent_mask(src.size(0)).to(src.device)
+        # print(text_mask.size())
         output = self.transformer_encoder(src, text_mask)
+        # print(output.size())
+        output = output[-1, :, :]
+        # output = F.hardswish(self.hidden(output))  # todo: should try use all these instead of just the last
+        # print(output.size())
         y = F.linear(output, self.embedding.weight.data)
+        return y
+
+
+class LSTM_AE(nn.Module):
+    def __init__(self, vocab_size, embed_dim):
+        super().__init__()
+        self.hidden_units = embed_dim
+        self.vocab_size = vocab_size
+        self.embedding = nn.Embedding(vocab_size, embed_dim, sparse=True)
+        self.hidden = nn.LSTM(embed_dim, embed_dim, 2)
+        self.decode = nn.Linear(embed_dim, embed_dim)
+        self.init_weights()
+
+    def init_weights(self):
+        initrange = 0.5
+        self.embedding.weight.data.uniform_(-initrange, initrange)
+        self.decode.weight.data.uniform_(-initrange, initrange)
+        for value in self.hidden.state_dict():
+            param = self.hidden.state_dict()[value]
+            if 'weight_ih' in value:
+                torch.nn.init.orthogonal_(self.hidden.state_dict()[value])
+            elif 'weight_hh' in value:
+                weight_hh_data_ii = torch.eye(self.hidden_units, self.hidden_units)  # H_Wii
+                weight_hh_data_if = torch.eye(self.hidden_units, self.hidden_units)  # H_Wif
+                weight_hh_data_ic = torch.eye(self.hidden_units, self.hidden_units)  # H_Wic
+                weight_hh_data_io = torch.eye(self.hidden_units, self.hidden_units)  # H_Wio
+                weight_hh_data = torch.stack([weight_hh_data_ii, weight_hh_data_if, weight_hh_data_ic, weight_hh_data_io], dim=0)
+                weight_hh_data = weight_hh_data.view(self.hidden_units * 4, self.hidden_units)
+                self.hidden.state_dict()[value].data.copy_(weight_hh_data)
+            elif 'bias' in value:
+                torch.nn.init.constant_(self.hidden.state_dict()[value], val=0)
+                self.hidden.state_dict()[value].data[self.hidden_units:self.hidden_units * 2].fill_(1)
+
+    def forward(self, text):
+        embedded = self.embedding(text)
+        x, (hn, cn) = self.hidden(embedded)  # (seq_len, batch, hidden_size)
+        x = x[-1, :, :]
+        x = F.hardswish(self.decode(x))
+        y = F.linear(x, self.embedding.weight.data)
         return y
 
 

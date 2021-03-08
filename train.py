@@ -1,5 +1,5 @@
 from datagen import QuoraDataset, SynonymsDataset, WordTriplet, WordDataset
-from models import TextSentiment, ContrastiveLoss, AutoEncoder, AEv2
+from models import TextSentiment, ContrastiveLoss, AutoEncoder, AEv2, TransformerModel
 from torch.utils.data import DataLoader
 import torch
 import tensorflow as tf
@@ -9,7 +9,7 @@ from sklearn.metrics import f1_score
 
 
 if __name__ == '__main__':
-    device = 'cuda'
+    device = 'cpu'
     dataset = WordDataset()
     dataset_size = len(dataset)
     indices = list(range(dataset_size))
@@ -31,7 +31,8 @@ if __name__ == '__main__':
                                                     num_workers=1,
                                                     collate_fn=dataset.collate_fn,
                                                     )
-    model = AEv2(dataset.vocab_len, 1024)
+    # model = AEv2(dataset.vocab_len, 1024)
+    model = TransformerModel(dataset.vocab_len, dataset.vocab_len, 1024)
     model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), 0.01)
     schedule = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=10, min_lr=1e-6)
@@ -43,8 +44,8 @@ if __name__ == '__main__':
         progbar = tf.keras.utils.Progbar(len(train_loader),
                                          stateful_metrics=['current_loss'])
         for idx, (word, pos_tokens, ) in enumerate(train_loader):
-            y_text = model(pos_tokens.to(device))
             target = torch.nn.functional.one_hot(word[0], num_classes=vocabs).float()
+            y_text = model(pos_tokens.to(device), target.long().to(device))
             weight = (torch.FloatTensor(*target.size()).uniform_() < 20/vocabs).float()
             weight[target == 1] = 1
             # loss = criterion(y_text, target.to(device))

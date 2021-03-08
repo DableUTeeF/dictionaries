@@ -31,8 +31,8 @@ if __name__ == '__main__':
                                                     num_workers=1,
                                                     collate_fn=dataset.collate_fn,
                                                     )
-    # model = AEv2(dataset.vocab_len, 1024)
-    model = TransformerModel(dataset.vocab_len, dataset.vocab_len, 1024)
+    model = AEv2(dataset.vocab_len, 1024)
+    # model = TransformerModel(dataset.vocab_len, dataset.vocab_len, 1024)
     model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), 0.01)
     schedule = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=10, min_lr=1e-6)

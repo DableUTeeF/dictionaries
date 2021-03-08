@@ -123,12 +123,13 @@ class AEv2(nn.Module):
         self.vocab_size = vocab_size
         self.embedding = nn.Embedding(vocab_size, embed_dim, sparse=False)
         self.hidden = nn.Linear(embed_dim, embed_dim)
-        self.decoder = nn.Linear(embed_dim, vocab_size)
         encoder_layers = nn.TransformerEncoderLayer(embed_dim, 2, transformer_dim, dropout=0.1)
         self.transformer_encoder = nn.TransformerEncoder(encoder_layers, 4)
         decoder_layer = nn.TransformerDecoderLayer(embed_dim, 2, transformer_dim, dropout=0.1)
         self.transformer_decoder = nn.TransformerDecoder(decoder_layer, 4)
         self.pos_encoder = PositionalEncoding(embed_dim, 0.5)
+        self.decoder = nn.Embedding(vocab_size, embed_dim)
+        self.pos_decoder = PositionalEncoding(embed_dim, 0.5)
         self.init_weights()
 
     def init_weights(self):
@@ -140,16 +141,20 @@ class AEv2(nn.Module):
         mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
         return mask
 
-    def forward(self, text):
+    def forward(self, text, word):
+        print(text.size(), word.size())
         src = self.embedding(text)
         src = self.pos_encoder(src)
         text_mask = self.generate_square_subsequent_mask(src.size(0)).to(src.device)
         print(src.size())
         output = self.transformer_encoder(src, text_mask)
         print(output.size())
-        output = self.transformer_decoder(output, text_mask)
-        print(output.size())
         output = output[-1, :, :]
+        tgt = self.decoder(word)
+        tgt = self.pos_decoder(tgt)
+        print(tgt.size())
+        output = self.transformer_decoder(output, tgt)
+        print(output.size())
         y = F.linear(output, self.embedding.weight.data)
         # y = self.decoder(output)
         return y

@@ -1,5 +1,5 @@
 from datagen import QuoraDataset, SynonymsDataset, WordTriplet, WordDataset
-from models import TextSentiment, ContrastiveLoss, AutoEncoder, LSTM_AE
+from models import TextSentiment, ContrastiveLoss, AutoEncoder, AEv2
 from torch.utils.data import DataLoader
 import torch
 import tensorflow as tf
@@ -31,9 +31,9 @@ if __name__ == '__main__':
                                                     num_workers=1,
                                                     collate_fn=dataset.collate_fn,
                                                     )
-    model = AutoEncoder(dataset.vocab_len, 1024)
+    model = AEv2(dataset.vocab_len, 1024)
     model.to(device)
-    optimizer = torch.optim.Adam(model.parameters(), 0.001)
+    optimizer = torch.optim.Adam(model.parameters(), 0.01)
     schedule = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=10, min_lr=1e-6)
     criterion = torch.nn.BCEWithLogitsLoss()
     vocabs = dataset.vocab_len
@@ -45,7 +45,12 @@ if __name__ == '__main__':
         for idx, (word, pos_tokens, ) in enumerate(train_loader):
             y_text = model(pos_tokens.to(device))
             target = torch.nn.functional.one_hot(word[0], num_classes=vocabs).float()
-            loss = criterion(y_text, target.to(device))
+            weight = (torch.FloatTensor(*target.size()).uniform_() < 20/vocabs).float()
+            weight[target == 1] = 1
+            # loss = criterion(y_text, target.to(device))
+            loss = torch.nn.functional.binary_cross_entropy_with_logits(y_text,
+                                                                        target.to(device),
+                                                                        weight.to(device))
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
@@ -64,4 +69,4 @@ if __name__ == '__main__':
                 progbar.update(idx + 1, [('val_loss', loss.detach().item()),
                                          ('current_loss', loss.detach().item())])
         # if epoch % 10 == 1:
-            torch.save(model.state_dict(), f"/media/palm/BiggerData/dictionaries/cp/{progbar._values['val_loss'][0]/progbar._values['val_loss'][1]:.6f}.pth")
+        #     torch.save(model.state_dict(), f"/media/palm/BiggerData/dictionaries/cp/{progbar._values['val_loss'][0]/progbar._values['val_loss'][1]:.6f}.pth")

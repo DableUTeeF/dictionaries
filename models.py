@@ -62,6 +62,7 @@ class TextSentiment(nn.Module):
         x = self.fc(x)
         return x
 
+
 class PositionalEncoding(nn.Module):
     def __init__(self, d_model, dropout=0.1, max_len=5000):
         super(PositionalEncoding, self).__init__()
@@ -81,13 +82,13 @@ class PositionalEncoding(nn.Module):
 
 
 class AutoEncoder(nn.Module):
-    def __init__(self, vocab_size, embed_dim, transformer_dim=200):
+    def __init__(self, vocab_size, embed_dim, transformer_dim=2048):
         super().__init__()
         self.embed_dim = embed_dim
         self.vocab_size = vocab_size
         self.embedding = nn.Embedding(vocab_size, embed_dim, sparse=False)
         self.hidden = nn.Linear(embed_dim, embed_dim)
-        encoder_layers = nn.TransformerEncoderLayer(embed_dim, 2, transformer_dim, dropout=0.5)
+        encoder_layers = nn.TransformerEncoderLayer(embed_dim, 2, transformer_dim, dropout=0.1)
         self.transformer_encoder = nn.TransformerEncoder(encoder_layers, 4)
         self.pos_encoder = PositionalEncoding(embed_dim, 0.5)
         self.init_weights()
@@ -102,18 +103,52 @@ class AutoEncoder(nn.Module):
         return mask
 
     def forward(self, text):
-        src = self.embedding(text) * math.sqrt(self.embed_dim)
-        # print(text.size())
-        src = self.pos_encoder(src)
+        src = self.embedding(text)
+        # print(src.size())
+        # src = self.pos_encoder(src)
         # print(src.size())
         text_mask = self.generate_square_subsequent_mask(src.size(0)).to(src.device)
-        # print(text_mask.size())
         output = self.transformer_encoder(src, text_mask)
-        # print(output.size())
         output = output[-1, :, :]
-        # output = F.hardswish(self.hidden(output))  # todo: should try use all these instead of just the last
-        # print(output.size())
+        # output = F.relu(self.hidden(output))  # todo: should try use all these instead of just the last
         y = F.linear(output, self.embedding.weight.data)
+        # y = self.decoder(output)
+        return y
+
+
+class AEv2(nn.Module):
+    def __init__(self, vocab_size, embed_dim, transformer_dim=2048):
+        super().__init__()
+        self.embed_dim = embed_dim
+        self.vocab_size = vocab_size
+        self.embedding = nn.Embedding(vocab_size, embed_dim, sparse=False)
+        self.hidden = nn.Linear(embed_dim, embed_dim)
+        self.decoder = nn.Linear(embed_dim, vocab_size)
+        encoder_layers = nn.TransformerEncoderLayer(embed_dim, 2, transformer_dim, dropout=0.1)
+        self.transformer_encoder = nn.TransformerEncoder(encoder_layers, 4)
+        decoder_layer = nn.TransformerDecoderLayer(embed_dim, 2, transformer_dim, dropout=0.1)
+        self.transformer_decoder = nn.TransformerDecoder(decoder_layer, 4)
+        self.pos_encoder = PositionalEncoding(embed_dim, 0.5)
+        self.init_weights()
+
+    def init_weights(self):
+        initrange = 0.5
+        self.embedding.weight.data.uniform_(-initrange, initrange)
+
+    def generate_square_subsequent_mask(self, sz):
+        mask = (torch.triu(torch.ones(sz, sz)) == 1).transpose(0, 1)
+        mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
+        return mask
+
+    def forward(self, text):
+        src = self.embedding(text)
+        src = self.pos_encoder(src)
+        text_mask = self.generate_square_subsequent_mask(src.size(0)).to(src.device)
+        output = self.transformer_encoder(src, text_mask)
+        output = self.transformer_decoder(output, text_mask)
+        output = output[-1, :, :]
+        y = F.linear(output, self.embedding.weight.data)
+        # y = self.decoder(output)
         return y
 
 

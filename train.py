@@ -9,7 +9,7 @@ from sklearn.metrics import f1_score
 
 
 if __name__ == '__main__':
-    device = 'cpu'
+    device = 'cuda'
     dataset = WordDataset()
     dataset_size = len(dataset)
     indices = list(range(dataset_size))
@@ -45,7 +45,7 @@ if __name__ == '__main__':
                                          stateful_metrics=['current_loss'])
         for idx, (word, pos_tokens, ) in enumerate(train_loader):
             target = torch.nn.functional.one_hot(word[0], num_classes=vocabs).float()
-            y_text = model(pos_tokens.to(device), target.long().to(device))
+            y_text = model(pos_tokens.to(device), pos_tokens.to(device))
             weight = (torch.FloatTensor(*target.size()).uniform_() < 20/vocabs).float()
             weight[target == 1] = 1
             # loss = criterion(y_text, target.to(device))
@@ -64,7 +64,7 @@ if __name__ == '__main__':
         min_loss = 100
         with torch.no_grad():
             for idx, (word, pos_tokens, ) in enumerate(validation_loader):
-                y_text = model(pos_tokens.to(device))
+                y_text = model(pos_tokens.to(device), pos_tokens.to(device))
                 target = torch.nn.functional.one_hot(word[0], num_classes=vocabs).float()
                 loss = criterion(y_text, target.to(device))
                 progbar.update(idx + 1, [('val_loss', loss.detach().item()),

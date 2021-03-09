@@ -102,7 +102,7 @@ class WordDataset(Dataset):
             for meaning in word:
                 self.max_len = max(self.max_len, len(meaning.definition().split(' ')))
                 counter.update(meaning.definition().split(' '))
-        self.vocab = Vocab(counter, min_freq=5)
+        self.vocab = Vocab(counter, min_freq=5, specials=('<unk>', '<pad>', '<sos>', '<eos>'))
         self.vocab_len = len(self.vocab)
         self.meanings = []
         for word in words:
@@ -118,11 +118,10 @@ class WordDataset(Dataset):
     def __getitem__(self, index):
         word, tokens = self.meanings[index]
         data = wn.synsets(word)
-        token_ids = list(filter(lambda x: x is not Vocab.UNK, [self.vocab[token]
-                                                                   for token in tokens.split(' ')]))
+        token_ids = [self.vocab['<sos>']] + list(filter(lambda x: x is not Vocab.UNK, [self.vocab[token] for token in tokens.split(' ')])) + [self.vocab['<eos>']]
 
         tokens = torch.tensor(token_ids)
-        word = torch.tensor([self.vocab[word]])
+        word = torch.tensor([self.vocab['<sos>'], self.vocab[word], self.vocab['<eos>']])
         return word, tokens
 
 
@@ -131,16 +130,14 @@ class WordTriplet(WordDataset):
         word = self.words[index]
         data = wn.synsets(word)
         pos_tokens = np.random.choice(data).definition()
-        pos_token_ids = list(filter(lambda x: x is not Vocab.UNK, [self.vocab[token]
-                                                                   for token in pos_tokens.split(' ')]))
+        pos_token_ids = list(filter(lambda x: x is not Vocab.UNK, [self.vocab[token] for token in pos_tokens.split(' ')]))
         while True:
             idx = torch.randint(0, len(self), (1,))
             if idx != index:
                 break
         diff_data = wn.synsets(self.words[idx])
         neg_tokens = diff_data[0].definition()
-        neg_token_ids = list(filter(lambda x: x is not Vocab.UNK, [self.vocab[token]
-                                                                   for token in neg_tokens.split(' ')]))
+        neg_token_ids = list(filter(lambda x: x is not Vocab.UNK, [self.vocab[token] for token in neg_tokens.split(' ')]))
 
         neg_tokens = torch.tensor(neg_token_ids)
         pos_tokens = torch.tensor(pos_token_ids)

@@ -31,10 +31,10 @@ if __name__ == '__main__':
                                                     num_workers=1,
                                                     collate_fn=dataset.collate_fn,
                                                     )
-    model = AEv2(dataset.vocab_len, 1024)
-    # model = TransformerModel(dataset.vocab_len, dataset.vocab_len, 1024)
+    # model = AEv2(dataset.vocab_len, 1024)
+    model = TransformerModel(dataset.vocab_len, dataset.vocab_len, 1024)
     model.to(device)
-    optimizer = torch.optim.Adam(model.parameters(), 0.01)
+    optimizer = torch.optim.AdamW(model.parameters())
     schedule = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=10, min_lr=1e-6)
     criterion = torch.nn.BCEWithLogitsLoss()
     vocabs = dataset.vocab_len
@@ -45,7 +45,7 @@ if __name__ == '__main__':
                                          stateful_metrics=['current_loss'])
         for idx, (word, pos_tokens, ) in enumerate(train_loader):
             target = torch.nn.functional.one_hot(word[0], num_classes=vocabs).float()
-            y_text = model(pos_tokens.to(device), pos_tokens.to(device))
+            y_text = model(pos_tokens.to(device), word.to(device))
             weight = (torch.FloatTensor(*target.size()).uniform_() < 20/vocabs).float()
             weight[target == 1] = 1
             # loss = criterion(y_text, target.to(device))

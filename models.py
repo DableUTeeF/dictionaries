@@ -205,7 +205,7 @@ class TransformerModel(nn.Module):
                                   memory_mask=self.memory_mask,
                                   src_key_padding_mask=src_pad_mask, tgt_key_padding_mask=trg_pad_mask,
                                   memory_key_padding_mask=src_pad_mask)
-        output = self.fc_out(output)
+        output = self.fc_out(output[-1])
 
         return output
 

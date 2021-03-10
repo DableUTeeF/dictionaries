@@ -38,7 +38,7 @@ if __name__ == '__main__':
     schedule = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=10, min_lr=1e-6)
     criterion = torch.nn.BCEWithLogitsLoss()
     vocabs = dataset.vocab_len
-    for epoch in range(200):
+    for epoch in range(20):
         print('Epoch:', epoch + 1)
         model.train()
         progbar = tf.keras.utils.Progbar(len(train_loader),
@@ -64,10 +64,10 @@ if __name__ == '__main__':
         min_loss = 100
         with torch.no_grad():
             for idx, (word, pos_tokens, ) in enumerate(validation_loader):
-                y_text = model(pos_tokens.to(device), pos_tokens.to(device))
+                y_text = model(pos_tokens.to(device), word.to(device))
                 target = torch.nn.functional.one_hot(word[0], num_classes=vocabs).float()
                 loss = criterion(y_text, target.to(device))
                 progbar.update(idx + 1, [('val_loss', loss.detach().item()),
                                          ('current_loss', loss.detach().item())])
         # if epoch % 10 == 1:
-        #     torch.save(model.state_dict(), f"/media/palm/BiggerData/dictionaries/cp/{progbar._values['val_loss'][0]/progbar._values['val_loss'][1]:.6f}.pth")
+        #     torch.save(model.state_dict(), f"/media/palm/BiggerData/dictionaries/cp/{epoch:02d}_{progbar._values['val_loss'][0]/progbar._values['val_loss'][1]:.6f}.pth")

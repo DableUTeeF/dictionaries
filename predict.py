@@ -21,11 +21,7 @@ if __name__ == '__main__':
     valid_sampler = SubsetRandomSampler(val_indices)
 
     model = TransformerModel(dataset.vocab_len, dataset.vocab_len, 1024)
-<<<<<<< HEAD
     state = torch.load('01_0.000197.pth')
-=======
-    state = torch.load('/media/palm/BiggerData/dictionaries/cp/00_0.000189.pth')
->>>>>>> 244cad567306577bd74f719d092fd0e135690b3d
     model.load_state_dict(state)
     model.to(device)
     model.eval()

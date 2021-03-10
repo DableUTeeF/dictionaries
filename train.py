@@ -45,22 +45,10 @@ if __name__ == '__main__':
         progbar = tf.keras.utils.Progbar(len(train_loader),
                                          stateful_metrics=['current_loss'])
         for idx, (word, pos_tokens, ) in enumerate(train_loader):
-<<<<<<< HEAD
             src, trg = pos_tokens.to(device), word.to(device)
             output = model(src, trg)
             target = torch.nn.functional.one_hot(trg.transpose(0, 1), num_classes=vocabs).float()
             loss = criterion(output.transpose(0, 1).transpose(1, 2), target.transpose(1, 2))
-=======
-            y_text = model(pos_tokens.to(device), word[:-1, :].to(device))
-            # weight = (torch.FloatTensor(*target.size()).uniform_() < 20/vocabs).float()
-            # weight[target == 1] = 1
-
-            loss = criterion(y_text, word[1:, :].to(device))
-
-            # loss = torch.nn.functional.binary_cross_entropy_with_logits(y_text,
-            #                                                             target.to(device),
-            #                                                             weight.to(device))
->>>>>>> 244cad567306577bd74f719d092fd0e135690b3d
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()

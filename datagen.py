@@ -6,6 +6,7 @@ from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data.sampler import SubsetRandomSampler
 import numpy as np
 import pandas as pd
+import re
 
 
 def generate_batch(batch):
@@ -100,8 +101,13 @@ class WordDataset(Dataset):
             counter.update([word])
             word = wn.synsets(word)
             for meaning in word:
-                self.max_len = max(self.max_len, len(meaning.definition().split(' ')))
-                counter.update(meaning.definition().split(' '))
+                definition = re.sub(r'\([^)]*\)', '', meaning.definition())
+                if len(definition) == 0:
+                    continue
+                if definition[0] == ' ':
+                    definition = definition[1:]
+                self.max_len = max(self.max_len, len(definition.split(' ')))
+                counter.update(definition.split(' '))
         self.vocab = Vocab(counter, min_freq=5, specials=('<unk>', '<pad>', '<sos>', '<eos>'))
         self.vocab_len = len(self.vocab)
         self.meanings = []

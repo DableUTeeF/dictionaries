@@ -44,14 +44,10 @@ if __name__ == '__main__':
         progbar = tf.keras.utils.Progbar(len(train_loader),
                                          stateful_metrics=['current_loss'])
         for idx, (word, pos_tokens, ) in enumerate(train_loader):
-            target = torch.nn.functional.one_hot(word[0], num_classes=vocabs).float()
-            y_text = model(pos_tokens.to(device), word.to(device))
-            weight = (torch.FloatTensor(*target.size()).uniform_() < 20/vocabs).float()
-            weight[target == 1] = 1
-            # loss = criterion(y_text, target.to(device))
-            loss = torch.nn.functional.binary_cross_entropy_with_logits(y_text,
-                                                                        target.to(device),
-                                                                        weight.to(device))
+            src, trg = pos_tokens.to(device), word.to(device)
+            output = model(src, trg)
+            target = torch.nn.functional.one_hot(trg.transpose(0, 1), num_classes=vocabs).float()
+            loss = criterion(output.transpose(0, 1).transpose(1, 2), target.transpose(1, 2))
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
@@ -64,9 +60,10 @@ if __name__ == '__main__':
         min_loss = 100
         with torch.no_grad():
             for idx, (word, pos_tokens, ) in enumerate(validation_loader):
-                y_text = model(pos_tokens.to(device), word.to(device))
-                target = torch.nn.functional.one_hot(word[0], num_classes=vocabs).float()
-                loss = criterion(y_text, target.to(device))
+                src, trg = pos_tokens.to(device), word.to(device)
+                output = model(src, trg)
+                target = torch.nn.functional.one_hot(trg.transpose(0, 1), num_classes=vocabs).float()
+                loss = criterion(output.transpose(0, 1).transpose(1, 2), target.transpose(1, 2))
                 progbar.update(idx + 1, [('val_loss', loss.detach().item()),
                                          ('current_loss', loss.detach().item())])
         # if epoch % 10 == 1:

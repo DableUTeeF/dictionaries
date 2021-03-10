@@ -11,6 +11,8 @@ from sklearn.metrics import f1_score
 if __name__ == '__main__':
     device = 'cuda'
     dataset = WordDataset()
+    vocabs = dataset.vocab_len
+    pad_idx = dataset.vocab['<pad>']
     dataset_size = len(dataset)
     indices = list(range(dataset_size))
     split = int(np.floor(0.2 * dataset_size))
@@ -36,22 +38,22 @@ if __name__ == '__main__':
     model.to(device)
     optimizer = torch.optim.AdamW(model.parameters())
     schedule = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=10, min_lr=1e-6)
-    criterion = torch.nn.BCEWithLogitsLoss()
-    vocabs = dataset.vocab_len
+    criterion = torch.nn.CrossEntropyLoss(ignore_index=pad_idx)
     for epoch in range(20):
         print('Epoch:', epoch + 1)
         model.train()
         progbar = tf.keras.utils.Progbar(len(train_loader),
                                          stateful_metrics=['current_loss'])
         for idx, (word, pos_tokens, ) in enumerate(train_loader):
-            target = torch.nn.functional.one_hot(word[0], num_classes=vocabs).float()
-            y_text = model(pos_tokens.to(device), word.to(device))
-            weight = (torch.FloatTensor(*target.size()).uniform_() < 20/vocabs).float()
-            weight[target == 1] = 1
-            # loss = criterion(y_text, target.to(device))
-            loss = torch.nn.functional.binary_cross_entropy_with_logits(y_text,
-                                                                        target.to(device),
-                                                                        weight.to(device))
+            y_text = model(pos_tokens.to(device), word[:-1, :].to(device))
+            # weight = (torch.FloatTensor(*target.size()).uniform_() < 20/vocabs).float()
+            # weight[target == 1] = 1
+
+            loss = criterion(y_text, word[1:, :].to(device))
+
+            # loss = torch.nn.functional.binary_cross_entropy_with_logits(y_text,
+            #                                                             target.to(device),
+            #                                                             weight.to(device))
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()

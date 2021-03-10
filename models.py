@@ -3,6 +3,7 @@ from torch import nn
 from torch.nn import functional as F
 import math
 
+
 class ContrastiveLoss(nn.Module):
     """
     Contrastive loss function.

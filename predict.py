@@ -21,13 +21,13 @@ if __name__ == '__main__':
     valid_sampler = SubsetRandomSampler(val_indices)
 
     model = TransformerModel(dataset.vocab_len, dataset.vocab_len, 1024)
-    state = torch.load('/media/palm/BiggerData/dictionaries/cp/00_0.000189.pth')
+    state = torch.load('/home/palm/PycharmProjects/nlp/10_0.000011.pth')
     model.load_state_dict(state)
     model.to(device)
+    model.eval()
     vocabs = len(dataset.vocab)
     for idx in valid_sampler:
         word, pos_tokens = dataset[idx]
-        word2, pos_tokens2 = dataset.collate_fn([word, pos_tokens])
-        y_text = model(pos_tokens.to(device), word.to(device))
+        y_text = model(pos_tokens.unsqueeze(1).to(device), word.unsqueeze(1).to(device))
         print(torch.argmax(y_text, 1))
         print([dataset.vocab.itos[i] for i in torch.argmax(y_text, 1)])

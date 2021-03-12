@@ -11,7 +11,7 @@ from sklearn.metrics import f1_score
 if __name__ == '__main__':
     device = 'cuda'
     dataset = WordDataset()
-    vocabs = dataset.vocab_len
+    vocabs = dataset.out_vocab_len
     pad_idx = dataset.vocab['<pad>']
     dataset_size = len(dataset)
     indices = list(range(dataset_size))
@@ -23,7 +23,7 @@ if __name__ == '__main__':
     train_sampler = SubsetRandomSampler(train_indices)
     valid_sampler = SubsetRandomSampler(val_indices)
 
-    train_loader = torch.utils.data.DataLoader(dataset, batch_size=32,
+    train_loader = torch.utils.data.DataLoader(dataset, batch_size=8,
                                                sampler=train_sampler,
                                                num_workers=1,
                                                collate_fn=dataset.collate_fn,
@@ -34,12 +34,12 @@ if __name__ == '__main__':
                                                     collate_fn=dataset.collate_fn,
                                                     )
     # model = AEv2(dataset.vocab_len, 1024)
-    model = TransformerModel(dataset.vocab_len, dataset.vocab_len, 1024)
+    model = TransformerModel(dataset.vocab_len, dataset.out_vocab_len, 1024)
     model.to(device)
-    optimizer = torch.optim.AdamW(model.parameters())
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
     schedule = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=10, min_lr=1e-6)
     criterion = torch.nn.BCEWithLogitsLoss()
-    for epoch in range(20):
+    for epoch in range(200):
         print('Epoch:', epoch + 1)
         model.train()
         progbar = tf.keras.utils.Progbar(len(train_loader),
@@ -67,5 +67,6 @@ if __name__ == '__main__':
                 loss = criterion(output.transpose(0, 1).transpose(1, 2), target.transpose(1, 2))
                 progbar.update(idx + 1, [('val_loss', loss.detach().item()),
                                          ('current_loss', loss.detach().item())])
-        # if epoch % 10 == 1:
-            torch.save(model.state_dict(), f"/media/palm/BiggerData/dictionaries/cp/{epoch:02d}_{progbar._values['val_loss'][0]/progbar._values['val_loss'][1]:.6f}.pth")
+        if epoch % 10 == 1:
+            torch.save(model.state_dict(), f"/media/palm/BiggerData/dictionaries/cp2/{epoch:02d}_{progbar._values['val_loss'][0]/progbar._values['val_loss'][1]:.6f}.pth")
+        torch.save(model.state_dict(), f"/media/palm/BiggerData/dictionaries/cp2/last.pth")

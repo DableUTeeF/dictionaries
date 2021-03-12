@@ -108,12 +108,16 @@ class WordDataset(Dataset):
                     definition = definition[1:]
                 self.max_len = max(self.max_len, len(definition.split(' ')))
                 counter.update(definition.split(' '))
-        self.vocab = Vocab(counter, min_freq=5, specials=('<unk>', '<pad>', '<sos>', '<eos>'))
+        self.vocab = Vocab(counter, specials=('<unk>', '<pad>', '<sos>', '<eos>'))
         self.vocab_len = len(self.vocab)
         self.meanings = []
+        out_counter = Counter()
         for word in words:
-            if counter[word] > 5:
+            if counter[word] > 3:
+                out_counter.update([word])
                 self.meanings.extend([(word, i.definition()) for i in wn.synsets(word)])
+        self.out_vocab = Vocab(out_counter, specials=('<unk>', '<pad>', '<sos>', '<eos>'))
+        self.out_vocab_len = len(self.out_vocab)
 
     def __len__(self):
         return len(self.meanings)
@@ -127,7 +131,7 @@ class WordDataset(Dataset):
         token_ids = [self.vocab['<sos>']] + list(filter(lambda x: x is not Vocab.UNK, [self.vocab[token] for token in tokens.split(' ')])) + [self.vocab['<eos>']]
 
         tokens = torch.tensor(token_ids)
-        word = torch.tensor([self.vocab['<sos>'], self.vocab[word], self.vocab['<eos>']])
+        word = torch.tensor([self.out_vocab['<sos>'], self.out_vocab[word], self.out_vocab['<eos>']])
         return word, tokens
 
 

@@ -8,7 +8,7 @@ import numpy as np
 
 
 if __name__ == '__main__':
-    device = 'cuda'
+    device = 'cpu'
     dataset = WordDataset()
     dataset_size = len(dataset)
     indices = list(range(dataset_size))
@@ -20,32 +20,28 @@ if __name__ == '__main__':
     train_sampler = SubsetRandomSampler(train_indices)
     valid_sampler = SubsetRandomSampler(val_indices)
 
-    model = TransformerModel(dataset.vocab_len, dataset.vocab_len, 1024)
-    state = torch.load('19_0.000205.pth')
+    model = TransformerModel(dataset.vocab_len, dataset.out_vocab_len, 1024)
+    state = torch.load('/media/palm/BiggerData/dictionaries/cp2/31_0.000277.pth', map_location='cpu')
     model.load_state_dict(state)
     model.to(device)
     model.eval()
-    vocabs = len(dataset.vocab)
+    vocabs = len(dataset.out_vocab)
     for idx in valid_sampler:
         word, pos_tokens = dataset[idx]
 
         memory = model.transformer.encoder(model.pos_encoder(model.encoder(pos_tokens.unsqueeze(1).to(device))))
-        out_indexes = [dataset.vocab.stoi['<sos>']]
+        out_indexes = [dataset.out_vocab.stoi['<sos>']]
         for i in range(2):
             trg_tensor = torch.LongTensor(out_indexes).unsqueeze(1).to(device)
             output = model.fc_out(model.transformer.decoder(model.pos_decoder(model.decoder(trg_tensor)), memory))
             out_token = output.argmax(2)[-1].item()
-            print(torch.max(output, 2)[0])
             out_indexes.append(out_token)
-            if out_token == dataset.vocab.stoi['<eos>']:
+            if out_token == dataset.out_vocab.stoi['<eos>']:
                 break
-        print([dataset.vocab.itos[i] for i in out_indexes],
-              dataset.vocab.itos[word[1]])
 
         y_text = model(pos_tokens.unsqueeze(1).to(device), word.unsqueeze(1).to(device))
-        # print([dataset.vocab.itos[i] for i in pos_tokens])
-        print([dataset.vocab.itos[i] for i in torch.argmax(y_text, 2)],
-              dataset.vocab.itos[word[1]])
-        print()
+        print(' '.join([dataset.vocab.itos[i] for i in pos_tokens]))
+        print(dataset.out_vocab.itos[out_indexes[1]], dataset.out_vocab.itos[word[1]])
+        print(dataset.out_vocab.itos[torch.argmax(y_text, 2)[0]], dataset.out_vocab.itos[word[1]])
         # print(torch.max(y_text, 2)[0])
         # print(torch.argmax(y_text, 2))

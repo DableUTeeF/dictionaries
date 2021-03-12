@@ -2,6 +2,7 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 import math
+import transformers
 
 
 class ContrastiveLoss(nn.Module):
@@ -159,6 +160,20 @@ class AEv2(nn.Module):
         y = F.linear(output, self.embedding.weight.data)
         # y = self.decoder(output)
         return y
+
+
+class BertAE(nn.Module):
+    def __init__(self, vocab_size):
+        super().__init__()
+        self.bert = transformers.BertModel.from_pretrained('bert-base-uncased')
+        self.bert.requires_grad_(False)
+        self.fc = nn.Linear(768, vocab_size)
+
+    def forward(self, text):
+        outputs = self.bert(text)
+        outputs = outputs.pooler_output
+        output = self.fc(outputs)
+        return output
 
 
 class TransformerModel(nn.Module):

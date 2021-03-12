@@ -7,14 +7,22 @@ from torch.utils.data.sampler import SubsetRandomSampler
 import numpy as np
 import pandas as pd
 import re
-
+import transformers
 
 def generate_batch(batch):
     text = [entry[0] for entry in batch]
     word = [entry[1] for entry in batch]
     text = pad_sequence(text)
     word = pad_sequence(word)
-    return text, word
+    return word, text
+
+
+def generate_bert_batch(batch):
+    word = [entry[0]['input_ids'][0] for entry in batch]
+    word = pad_sequence(word)
+    text = [entry[1]['input_ids'][0] for entry in batch]
+    text = pad_sequence(text)
+    return word, text
 
 
 def generate_triplet_batch(batch):
@@ -92,6 +100,25 @@ class SynonymsDataset(Dataset):
         return word, other, label
 
 
+class BertDataset(Dataset):
+    def __init__(self):
+        self.words = [(word, wn.synsets(word)[0].definition()) for word in list(set(i for i in wn.words()))]
+        self.tokenizer = transformers.BertTokenizer.from_pretrained('bert-base-uncased')
+        self.vocab_len = self.tokenizer.vocab_size
+
+    def __len__(self):
+        return len(self.words)
+
+    def __getitem__(self, idx):
+        word, tokens = self.words[idx]
+        word = self.tokenizer(word, return_tensors="pt")
+        tokens = self.tokenizer(tokens, return_tensors="pt")
+        return word, tokens
+
+    def collate_fn(self, batch):
+        return generate_bert_batch(batch)
+
+
 class WordDataset(Dataset):
     def __init__(self):
         words = list(set(i for i in wn.words()))
@@ -127,7 +154,7 @@ class WordDataset(Dataset):
 
     def __getitem__(self, index):
         word, tokens = self.meanings[index]
-        data = wn.synsets(word)
+        # data = wn.synsets(word)
         token_ids = [self.vocab['<sos>']] + list(filter(lambda x: x is not Vocab.UNK, [self.vocab[token] for token in tokens.split(' ')])) + [self.vocab['<eos>']]
 
         tokens = torch.tensor(token_ids)

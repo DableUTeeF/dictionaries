@@ -7,6 +7,7 @@ from torch.utils.data.sampler import SubsetRandomSampler
 import numpy as np
 import pandas as pd
 import re
+from transformers import BertTokenizer
 
 
 def generate_batch(batch):
@@ -90,6 +91,32 @@ class SynonymsDataset(Dataset):
         word = torch.tensor([self.vocab[word]])
         other = torch.tensor([self.vocab[other]])
         return word, other, label
+
+
+class BertDataset(Dataset):
+    def __init__(self):
+        words = list(set(i for i in wn.words()))
+        self.words = []
+        for word in words:
+            meanings = wn.synsets(word)
+            for meaning in meanings:
+                self.words.append((word, meaning.definition()))
+        self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+        self.vocab_size = self.tokenizer.vocab_size
+
+    def __len__(self):
+        return len(self.words)
+
+    def __getitem__(self, index):
+        word, text = self.words[index]
+        return word, text
+
+    def collate_fn(self, batch):
+        text = [entry[1] for entry in batch]
+        word = [entry[0] for entry in batch]
+        text = self.tokenizer(text, return_tensors='pt', padding=True)
+        word = self.tokenizer(word, return_tensors='pt', padding=True)
+        return word, text
 
 
 class WordDataset(Dataset):

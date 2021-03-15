@@ -2,6 +2,7 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 import math
+from transformers import BertModel
 
 
 class ContrastiveLoss(nn.Module):
@@ -80,6 +81,27 @@ class PositionalEncoding(nn.Module):
     def forward(self, x):
         x = x + self.pe[:x.size(0), :]
         return self.dropout(x)
+
+
+class BertAutoEncoder(nn.Module):
+    def __init__(self, vocab_size):
+        super().__init__()
+        self.bert = BertModel.from_pretrained('bert-base-uncased')
+        self.bert.requires_grad_(False)
+        decoder_layer = nn.TransformerDecoderLayer(768, 2, 1024, dropout=0.1)
+        self.transformer_decoder = nn.TransformerDecoder(decoder_layer, 2)
+        self.decoder = nn.Embedding(vocab_size, 768)
+        self.pos_decoder = PositionalEncoding(768, 0.5)
+        self.fc = nn.Linear(768, vocab_size)
+
+    def forward(self, text, word):
+        memory = self.bert(**text)
+        memory = memory.last_hidden_state.transpose(0, 1)
+        tgt = self.decoder(word.data['input_ids'][:, :-1].transpose(0, 1))
+        tgt = self.pos_decoder(tgt)
+        output = self.transformer_decoder(tgt, memory)
+        output = self.fc(output)
+        return output
 
 
 class AutoEncoder(nn.Module):

@@ -1,17 +1,17 @@
 from datagen import QuoraDataset, SynonymsDataset, WordTriplet, WordDataset, BertDataset
-from models import TextSentiment, ContrastiveLoss, AutoEncoder, AEv2, TransformerModel, BertAE
+from models import TextSentiment, ContrastiveLoss, AutoEncoder, AEv2, TransformerModel, BertAutoEncoder
 from torch.utils.data import DataLoader
 import torch
 import tensorflow as tf
 from torch.utils.data.sampler import SubsetRandomSampler
 import numpy as np
-from sklearn.metrics import f1_score
+from transformers import BertModel
 
 
 if __name__ == '__main__':
-    device = 'cpu'
+    device = 'cuda'
     dataset = BertDataset()
-    vocabs = dataset.vocab_len
+    vocabs = dataset.vocab_size
     dataset_size = len(dataset)
     indices = list(range(dataset_size))
     split = int(np.floor(0.2 * dataset_size))
@@ -32,8 +32,12 @@ if __name__ == '__main__':
                                                     num_workers=1,
                                                     collate_fn=dataset.collate_fn,
                                                     )
-    model = BertAE(dataset.vocab_len)
-    # model = TransformerModel(dataset.vocab_len, dataset.out_vocab_len, 1024)
+    model = BertAutoEncoder(dataset.vocab_size)
+    bert = BertModel.from_pretrained('bert-base-uncased')
+    bert.requires_grad_(False)
+    bert.to(device)
+
+    # model = TransformerModel(dataset.vocab_len, dataset.vocab_len, 1024)
     model.to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
     schedule = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=10, min_lr=1e-6)
@@ -45,9 +49,10 @@ if __name__ == '__main__':
                                          stateful_metrics=['current_loss'])
         for idx, (word, pos_tokens, ) in enumerate(train_loader):
             src, trg = pos_tokens.to(device), word.to(device)
-            output = model(src)
-            target = torch.nn.functional.one_hot(trg, num_classes=vocabs).float()
-            loss = criterion(output.transpose(1, 2), target.transpose(1, 2))
+            memory = bert(**src).last_hidden_state.transpose(0, 1)
+            output = model(memory, trg)
+            target = torch.nn.functional.one_hot(trg.data['input_ids'][:, 1:], num_classes=vocabs).float()
+            loss = criterion(output.transpose(0, 1).transpose(1, 2), target.transpose(1, 2))
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
@@ -61,8 +66,9 @@ if __name__ == '__main__':
         with torch.no_grad():
             for idx, (word, pos_tokens, ) in enumerate(validation_loader):
                 src, trg = pos_tokens.to(device), word.to(device)
-                output = model(src)
-                target = torch.nn.functional.one_hot(trg.transpose(0, 1), num_classes=vocabs).float()
+                memory = bert(**src).last_hidden_state.transpose(0, 1)
+                output = model(memory, trg)
+                target = torch.nn.functional.one_hot(trg[1:, :].transpose(0, 1), num_classes=vocabs).float()
                 loss = criterion(output.transpose(0, 1).transpose(1, 2), target.transpose(1, 2))
                 progbar.update(idx + 1, [('val_loss', loss.detach().item()),
                                          ('current_loss', loss.detach().item())])

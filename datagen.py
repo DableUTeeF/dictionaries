@@ -7,7 +7,8 @@ from torch.utils.data.sampler import SubsetRandomSampler
 import numpy as np
 import pandas as pd
 import re
-import transformers
+from transformers import BertTokenizer
+
 
 def generate_batch(batch):
     text = [entry[0] for entry in batch]
@@ -102,21 +103,29 @@ class SynonymsDataset(Dataset):
 
 class BertDataset(Dataset):
     def __init__(self):
-        self.words = [(word, wn.synsets(word)[0].definition()) for word in list(set(i for i in wn.words()))]
-        self.tokenizer = transformers.BertTokenizer.from_pretrained('bert-base-uncased')
-        self.vocab_len = self.tokenizer.vocab_size
+        words = list(set(i for i in wn.words()))
+        self.words = []
+        for word in words:
+            meanings = wn.synsets(word)
+            word = word.replace('_', ' ')
+            for meaning in meanings:
+                self.words.append((word, meaning.definition()))
+        self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+        self.vocab_size = self.tokenizer.vocab_size
 
     def __len__(self):
         return len(self.words)
 
-    def __getitem__(self, idx):
-        word, tokens = self.words[idx]
-        word = self.tokenizer(word, return_tensors="pt")
-        tokens = self.tokenizer(tokens, return_tensors="pt")
-        return word, tokens
+    def __getitem__(self, index):
+        word, text = self.words[index]
+        return word, text
 
     def collate_fn(self, batch):
-        return generate_bert_batch(batch)
+        text = [entry[1] for entry in batch]
+        word = [entry[0] for entry in batch]
+        text = self.tokenizer(text, return_tensors='pt', padding=True)
+        word = self.tokenizer(word, return_tensors='pt', padding=True)
+        return word, text
 
 
 class WordDataset(Dataset):

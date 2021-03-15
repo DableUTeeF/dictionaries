@@ -5,6 +5,7 @@ import torch
 import tensorflow as tf
 from torch.utils.data.sampler import SubsetRandomSampler
 import numpy as np
+from transformers import BertModel
 
 
 if __name__ == '__main__':
@@ -21,14 +22,18 @@ if __name__ == '__main__':
     valid_sampler = SubsetRandomSampler(val_indices)
 
     model = BertAutoEncoder(dataset.vocab_size)
-    state = torch.load('07_0.000027.pth')
+    state = torch.load('cp2/03_0.000089.pth')
     model.load_state_dict(state)
     model.to(device)
     model.eval()
+    bert = BertModel.from_pretrained('bert-base-uncased')
+    bert.requires_grad_(False)
+    bert.to(device)
+
     for idx in val_indices:
         word, pos_tokens = dataset.collate_fn([dataset[idx]])
 
-        memory = model.bert(**pos_tokens.to(device)).last_hidden_state.transpose(0, 1)
+        memory = bert(**pos_tokens.to(device)).last_hidden_state.transpose(0, 1)
         out_indexes = [101]
         for i in range(6):
             trg_tensor = torch.LongTensor(out_indexes).unsqueeze(1).to(device)

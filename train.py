@@ -46,8 +46,8 @@ if __name__ == '__main__':
         for idx, (word, pos_tokens, ) in enumerate(train_loader):
             src, trg = pos_tokens.to(device), word.to(device)
             output = model(src)
-            target = torch.nn.functional.one_hot(trg.transpose(0, 1), num_classes=vocabs).float()
-            loss = criterion(output.transpose(0, 1).transpose(1, 2), target.transpose(1, 2))
+            target = torch.nn.functional.one_hot(trg, num_classes=vocabs).float()
+            loss = criterion(output.transpose(1, 2), target.transpose(1, 2))
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()

@@ -19,9 +19,9 @@ def generate_batch(batch):
 
 def generate_bert_batch(batch):
     word = [entry[0]['input_ids'][0] for entry in batch]
-    word = pad_sequence(word)
+    word = pad_sequence(word, batch_first=True)
     text = [entry[1]['input_ids'][0] for entry in batch]
-    text = pad_sequence(text)
+    text = pad_sequence(text, batch_first=True)
     return word, text
 
 

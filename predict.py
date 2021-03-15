@@ -21,7 +21,7 @@ if __name__ == '__main__':
     valid_sampler = SubsetRandomSampler(val_indices)
 
     model = BertAutoEncoder(dataset.vocab_size)
-    state = torch.load('03_0.000048.pth')
+    state = torch.load('07_0.000027.pth')
     model.load_state_dict(state)
     model.to(device)
     model.eval()

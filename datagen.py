@@ -99,6 +99,7 @@ class BertDataset(Dataset):
         self.words = []
         for word in words:
             meanings = wn.synsets(word)
+            word = word.replace('_', ' ')
             for meaning in meanings:
                 self.words.append((word, meaning.definition()))
         self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')

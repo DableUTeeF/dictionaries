@@ -5,7 +5,7 @@ import torch
 import tensorflow as tf
 from torch.utils.data.sampler import SubsetRandomSampler
 import numpy as np
-from sklearn.metrics import f1_score
+from transformers import BertModel
 
 
 if __name__ == '__main__':
@@ -33,6 +33,10 @@ if __name__ == '__main__':
                                                     collate_fn=dataset.collate_fn,
                                                     )
     model = BertAutoEncoder(dataset.vocab_size)
+    bert = BertModel.from_pretrained('bert-base-uncased')
+    bert.requires_grad_(False)
+    bert.to(device)
+
     # model = TransformerModel(dataset.vocab_len, dataset.vocab_len, 1024)
     model.to(device)
     optimizer = torch.optim.AdamW(model.parameters())
@@ -45,7 +49,8 @@ if __name__ == '__main__':
                                          stateful_metrics=['current_loss'])
         for idx, (word, pos_tokens, ) in enumerate(train_loader):
             src, trg = pos_tokens.to(device), word.to(device)
-            output = model(src, trg)
+            memory = bert(**src).last_hidden_state.transpose(0, 1)
+            output = model(memory, trg)
             target = torch.nn.functional.one_hot(trg.data['input_ids'][:, 1:], num_classes=vocabs).float()
             loss = criterion(output.transpose(0, 1).transpose(1, 2), target.transpose(1, 2))
             loss.backward()
@@ -61,7 +66,8 @@ if __name__ == '__main__':
         with torch.no_grad():
             for idx, (word, pos_tokens, ) in enumerate(validation_loader):
                 src, trg = pos_tokens.to(device), word.to(device)
-                output = model(src, trg[:-1, :])
+                memory = bert(**src).last_hidden_state.transpose(0, 1)
+                output = model(memory, trg)
                 target = torch.nn.functional.one_hot(trg[1:, :].transpose(0, 1), num_classes=vocabs).float()
                 loss = criterion(output.transpose(0, 1).transpose(1, 2), target.transpose(1, 2))
                 progbar.update(idx + 1, [('val_loss', loss.detach().item()),

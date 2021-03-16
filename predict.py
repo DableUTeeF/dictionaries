@@ -1,5 +1,5 @@
 from datagen import QuoraDataset, SynonymsDataset, WordTriplet, WordDataset, BertDataset
-from models import TextSentiment, ContrastiveLoss, AutoEncoder, TransformerModel, BertAutoEncoder
+from models import TextSentiment, ContrastiveLoss, AutoEncoder, TransformerModel, BertAutoEncoder, BertAutoEncoderOld
 from torch.utils.data import DataLoader
 import torch
 import tensorflow as tf
@@ -9,7 +9,7 @@ from transformers import BertModel
 
 
 if __name__ == '__main__':
-    device = 'cuda'
+    device = 'cpu'
     dataset = BertDataset()
     dataset_size = len(dataset)
     indices = list(range(dataset_size))
@@ -22,13 +22,14 @@ if __name__ == '__main__':
     valid_sampler = SubsetRandomSampler(val_indices)
 
     model = BertAutoEncoder(dataset.vocab_size)
-    state = torch.load('/media/palm/BiggerData/dictionaries/cp3/00_0.000011.pth')
+    state = torch.load('/media/palm/BiggerData/dictionaries/cp3/18_6.66508952266402e-05.pth')
     model.load_state_dict(state)
     model.to(device)
     model.eval()
     bert = BertModel.from_pretrained('bert-base-uncased')
     bert.requires_grad_(False)
     bert.to(device)
+    bert.eval()
 
     for idx in val_indices:
         word, pos_tokens = dataset.collate_fn([dataset[idx]])
@@ -37,8 +38,12 @@ if __name__ == '__main__':
         out_indexes = [101]
         for i in range(6):
             trg_tensor = torch.LongTensor(out_indexes).unsqueeze(1).to(device)
-            embeded_word = bert.embeddings(trg_tensor, token_type_ids=torch.zeros_like(trg_tensor)).transpose(0, 1)
-            output = model.fc(model.transformer_decoder(embeded_word, memory))
+            if isinstance(model, BertAutoEncoder):
+                embeded_word = bert.embeddings(trg_tensor, token_type_ids=torch.zeros_like(trg_tensor)).transpose(0, 1)
+                output = model.fc(model.transformer_decoder(embeded_word, memory))
+            else:
+                output = model.pos_decoder(model.decoder(trg_tensor))
+                output = model.fc(model.transformer_decoder(output, memory))
             out_token = output.argmax(2)[-1].item()
             # print(torch.max(output, 2)[0])
             out_indexes.append(out_token)

@@ -96,6 +96,23 @@ class BertAutoEncoder(nn.Module):
         return output
 
 
+class BertAutoEncoderOld(nn.Module):
+    def __init__(self, vocab_size):
+        super().__init__()
+        decoder_layer = nn.TransformerDecoderLayer(768, 2, 1024, dropout=0.1)
+        self.transformer_decoder = nn.TransformerDecoder(decoder_layer, 2)
+        self.decoder = nn.Embedding(vocab_size, 768)
+        self.pos_decoder = PositionalEncoding(768, 0.5)
+        self.fc = nn.Linear(768, vocab_size)
+
+    def forward(self, memory, word):
+        tgt = self.decoder(word.data['input_ids'][:, :-1].transpose(0, 1))
+        tgt = self.pos_decoder(tgt)
+        output = self.transformer_decoder(tgt, memory)
+        output = self.fc(output)
+        return output
+
+
 class AutoEncoder(nn.Module):
     def __init__(self, vocab_size, embed_dim, transformer_dim=2048):
         super().__init__()

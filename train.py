@@ -22,7 +22,7 @@ if __name__ == '__main__':
     train_sampler = SubsetRandomSampler(train_indices)
     valid_sampler = SubsetRandomSampler(val_indices)
 
-    train_loader = torch.utils.data.DataLoader(dataset, batch_size=8,
+    train_loader = torch.utils.data.DataLoader(dataset, batch_size=32,
                                                sampler=train_sampler,
                                                num_workers=int(device=='cuda'),
                                                collate_fn=dataset.collate_fn,
@@ -53,7 +53,12 @@ if __name__ == '__main__':
             embeded_word = bert.embeddings(trg.data['input_ids'][:, :-1], token_type_ids=trg.data['token_type_ids'][:, :-1]).transpose(0, 1)
             output = model(memory, embeded_word)
             target = torch.nn.functional.one_hot(trg.data['input_ids'][:, 1:], num_classes=vocabs).float()
-            loss = criterion(output.transpose(0, 1).transpose(1, 2), target.transpose(1, 2))
+            weight = (torch.FloatTensor(*target.size()).uniform_() < 20/vocabs).float()
+            weight[target == 1] = 1
+            loss = torch.nn.functional.binary_cross_entropy_with_logits(output.transpose(0, 1).transpose(1, 2),
+                                                                        target.transpose(1, 2).to(device),
+                                                                        weight.transpose(1, 2).to(device))
+            # loss = criterion(output.transpose(0, 1).transpose(1, 2), target.transpose(1, 2))
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
@@ -75,5 +80,10 @@ if __name__ == '__main__':
                 progbar.update(idx + 1, [('val_loss', loss.detach().item()),
                                          ('current_loss', loss.detach().item())])
         # if epoch % 10 == 1:
-            torch.save(model.state_dict(), f"/media/palm/BiggerData/dictionaries/cp3/{epoch:02d}_{progbar._values['val_loss'][0]/progbar._values['val_loss'][1]}.pth")
+            the_loss = progbar._values['val_loss'][0]/progbar._values['val_loss'][1]
+            if abs(the_loss) > 1e-3:
+                the_loss = f'{the_loss:.4f}'
+            else:
+                the_loss = f'{the_loss:.4e}'
+            torch.save(model.state_dict(), f"/media/palm/BiggerData/dictionaries/cp3/{epoch:02d}_{the_loss}.pth")
         # torch.save(model.state_dict(), f"/media/palm/BiggerData/dictionaries/cp3/last.pth")

@@ -22,7 +22,7 @@ if __name__ == '__main__':
     valid_sampler = SubsetRandomSampler(val_indices)
 
     model = BertAutoEncoder(dataset.vocab_size)
-    state = torch.load('cp2/03_0.000089.pth')
+    state = torch.load('/media/palm/BiggerData/dictionaries/cp3/00_0.000011.pth')
     model.load_state_dict(state)
     model.to(device)
     model.eval()
@@ -37,8 +37,8 @@ if __name__ == '__main__':
         out_indexes = [101]
         for i in range(6):
             trg_tensor = torch.LongTensor(out_indexes).unsqueeze(1).to(device)
-            output = model.pos_decoder(model.decoder(trg_tensor))
-            output = model.fc(model.transformer_decoder(output, memory))
+            embeded_word = bert.embeddings(trg_tensor, token_type_ids=torch.zeros_like(trg_tensor)).transpose(0, 1)
+            output = model.fc(model.transformer_decoder(embeded_word, memory))
             out_token = output.argmax(2)[-1].item()
             # print(torch.max(output, 2)[0])
             out_indexes.append(out_token)

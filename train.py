@@ -42,7 +42,7 @@ if __name__ == '__main__':
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
     schedule = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=10, min_lr=1e-6)
     criterion = torch.nn.BCEWithLogitsLoss()
-    for epoch in range(200):
+    for epoch in range(20):
         print('Epoch:', epoch + 1)
         model.train()
         progbar = tf.keras.utils.Progbar(len(train_loader),
@@ -50,7 +50,8 @@ if __name__ == '__main__':
         for idx, (word, pos_tokens, ) in enumerate(train_loader):
             src, trg = pos_tokens.to(device), word.to(device)
             memory = bert(**src).last_hidden_state.transpose(0, 1)
-            output = model(memory, trg)
+            embeded_word = bert.embeddings(trg.data['input_ids'][:, :-1], token_type_ids=trg.data['token_type_ids'][:, :-1]).transpose(0, 1)
+            output = model(memory, embeded_word)
             target = torch.nn.functional.one_hot(trg.data['input_ids'][:, 1:], num_classes=vocabs).float()
             loss = criterion(output.transpose(0, 1).transpose(1, 2), target.transpose(1, 2))
             loss.backward()
@@ -67,11 +68,12 @@ if __name__ == '__main__':
             for idx, (word, pos_tokens, ) in enumerate(validation_loader):
                 src, trg = pos_tokens.to(device), word.to(device)
                 memory = bert(**src).last_hidden_state.transpose(0, 1)
-                output = model(memory, trg)
-                target = torch.nn.functional.one_hot(trg[1:, :].transpose(0, 1), num_classes=vocabs).float()
+                embeded_word = bert.embeddings(trg.data['input_ids'][:, :-1], token_type_ids=trg.data['token_type_ids'][:, :-1]).transpose(0, 1)
+                output = model(memory, embeded_word)
+                target = torch.nn.functional.one_hot(trg.data['input_ids'][:, 1:], num_classes=vocabs).float()
                 loss = criterion(output.transpose(0, 1).transpose(1, 2), target.transpose(1, 2))
                 progbar.update(idx + 1, [('val_loss', loss.detach().item()),
                                          ('current_loss', loss.detach().item())])
-        if epoch % 10 == 1:
-            torch.save(model.state_dict(), f"/media/palm/BiggerData/dictionaries/cp3/{epoch:02d}_{progbar._values['val_loss'][0]/progbar._values['val_loss'][1]:.6f}.pth")
-        torch.save(model.state_dict(), f"/media/palm/BiggerData/dictionaries/cp3/last.pth")
+        # if epoch % 10 == 1:
+            torch.save(model.state_dict(), f"/media/palm/BiggerData/dictionaries/cp3/{epoch:02d}_{progbar._values['val_loss'][0]/progbar._values['val_loss'][1]}.pth")
+        # torch.save(model.state_dict(), f"/media/palm/BiggerData/dictionaries/cp3/last.pth")

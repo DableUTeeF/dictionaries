@@ -18,11 +18,8 @@ if __name__ == '__main__':
     np.random.shuffle(indices)
     train_indices, val_indices = indices[split:], indices[:split]
 
-    train_sampler = SubsetRandomSampler(train_indices)
-    valid_sampler = SubsetRandomSampler(val_indices)
-
     model = BertAutoEncoder(dataset.vocab_size)
-    state = torch.load('cp2/03_0.000089.pth')
+    state = torch.load('cp3/08_5.05206e-05.pth')
     model.load_state_dict(state)
     model.to(device)
     model.eval()

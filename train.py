@@ -37,12 +37,15 @@ if __name__ == '__main__':
     bert.requires_grad_(False)
     bert.to(device)
 
+    state = torch.load('/media/palm/BiggerData/dictionaries/cp7/03_1.3419e-05.pth')
+    model.load_state_dict(state)
+
     # model = TransformerModel(dataset.vocab_len, dataset.vocab_len, 1024)
     model.to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
     schedule = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=10, min_lr=1e-6)
     criterion = torch.nn.BCEWithLogitsLoss()
-    for epoch in range(20):
+    for epoch in range(4, 20):
         print('Epoch:', epoch + 1)
         model.train()
         progbar = tf.keras.utils.Progbar(len(train_loader),
@@ -53,8 +56,9 @@ if __name__ == '__main__':
             embeded_word = bert.embeddings(trg.data['input_ids'][:, :-1], token_type_ids=trg.data['token_type_ids'][:, :-1]).transpose(0, 1)
             output = model(memory, embeded_word)
             target = torch.nn.functional.one_hot(trg.data['input_ids'][:, 1:], num_classes=vocabs).float()
-            weight = (torch.FloatTensor(*target.size()).uniform_() < 20/vocabs).float()
-            weight[target == 1] = 1
+            # weight = (torch.FloatTensor(*target.size()).uniform_() < 20/vocabs).float() + 1/vocabs
+            # weight = torch.zeros_like(target) + 1/vocabs
+            # weight[target == 1] = 1
             loss = torch.nn.functional.binary_cross_entropy_with_logits(output.transpose(0, 1).transpose(1, 2),
                                                                         target.transpose(1, 2).to(device),
                                                                         weight.transpose(1, 2).to(device))
@@ -85,5 +89,5 @@ if __name__ == '__main__':
                 the_loss = f'{the_loss:.4f}'
             else:
                 the_loss = f'{the_loss:.4e}'
-            torch.save(model.state_dict(), f"/media/palm/BiggerData/dictionaries/cp3/{epoch:02d}_{the_loss}.pth")
+            torch.save(model.state_dict(), f"/media/palm/BiggerData/dictionaries/cp7/{epoch:02d}_{the_loss}.pth")
         # torch.save(model.state_dict(), f"/media/palm/BiggerData/dictionaries/cp3/last.pth")

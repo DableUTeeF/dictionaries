@@ -1,9 +1,6 @@
 from datagen import QuoraDataset, SynonymsDataset, WordTriplet, WordDataset, BertDataset
 from models import TextSentiment, ContrastiveLoss, AutoEncoder, TransformerModel, BertAutoEncoder, BertAutoEncoderOld
-from torch.utils.data import DataLoader
 import torch
-import tensorflow as tf
-from torch.utils.data.sampler import SubsetRandomSampler
 import numpy as np
 from transformers import BertModel
 
@@ -19,7 +16,9 @@ if __name__ == '__main__':
     train_indices, val_indices = indices[split:], indices[:split]
 
     model = BertAutoEncoder(dataset.vocab_size)
-    state = torch.load('/media/palm/BiggerData/dictionaries/cp3/18_6.66508952266402e-05.pth')
+    pth = '/media/palm/BiggerData/dictionaries/cp7/02_0.0231.pth'
+    print(pth)
+    state = torch.load(pth)
     model.load_state_dict(state)
     model.to(device)
     model.eval()
@@ -34,11 +33,12 @@ if __name__ == '__main__':
         memory = bert(**pos_tokens.to(device)).last_hidden_state.transpose(0, 1)
         out_indexes = [101]
         for i in range(6):
-            trg_tensor = torch.LongTensor(out_indexes).unsqueeze(1).to(device)
             if isinstance(model, BertAutoEncoder):
+                trg_tensor = torch.LongTensor(out_indexes).unsqueeze(0).to(device)
                 embeded_word = bert.embeddings(trg_tensor, token_type_ids=torch.zeros_like(trg_tensor)).transpose(0, 1)
                 output = model.fc(model.transformer_decoder(embeded_word, memory))
             else:
+                trg_tensor = torch.LongTensor(out_indexes).unsqueeze(1).to(device)
                 output = model.pos_decoder(model.decoder(trg_tensor))
                 output = model.fc(model.transformer_decoder(output, memory))
             out_token = output.argmax(2)[-1].item()

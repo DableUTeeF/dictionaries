@@ -18,9 +18,6 @@ if __name__ == '__main__':
     np.random.shuffle(indices)
     train_indices, val_indices = indices[split:], indices[:split]
 
-    train_sampler = SubsetRandomSampler(train_indices)
-    valid_sampler = SubsetRandomSampler(val_indices)
-
     model = BertAutoEncoder(dataset.vocab_size)
     state = torch.load('/media/palm/BiggerData/dictionaries/cp3/18_6.66508952266402e-05.pth')
     model.load_state_dict(state)

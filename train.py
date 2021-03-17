@@ -61,10 +61,10 @@ if __name__ == '__main__':
         with torch.no_grad():
             for idx, (word, pos_tokens, ) in enumerate(validation_loader):
                 src, trg = pos_tokens.to(device), word.to(device)
-                output = model(src, trg[:-1, :])
-                target = torch.nn.functional.one_hot(trg[1:, :].transpose(0, 1), num_classes=vocabs).float()
+                output = model(src, trg)
+                target = torch.nn.functional.one_hot(trg.data['input_ids'][:, 1:], num_classes=vocabs).float()
                 loss = criterion(output.transpose(0, 1).transpose(1, 2), target.transpose(1, 2))
                 progbar.update(idx + 1, [('val_loss', loss.detach().item()),
                                          ('current_loss', loss.detach().item())])
         # if epoch % 10 == 1:
-            torch.save(model.state_dict(), f"/media/palm/BiggerData/dictionaries/cp/{epoch:02d}_{progbar._values['val_loss'][0]/progbar._values['val_loss'][1]:.6f}.pth")
+            torch.save(model.state_dict(), f"/media/palm/BiggerData/dictionaries/cp5/{epoch:02d}_{progbar._values['val_loss'][0]/progbar._values['val_loss'][1]:.6e}.pth")

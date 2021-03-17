@@ -8,7 +8,7 @@ import numpy as np
 
 
 if __name__ == '__main__':
-    device = 'cuda'
+    device = 'cpu'
     dataset = BertDataset()
     dataset_size = len(dataset)
     indices = list(range(dataset_size))
@@ -17,11 +17,8 @@ if __name__ == '__main__':
     np.random.shuffle(indices)
     train_indices, val_indices = indices[split:], indices[:split]
 
-    train_sampler = SubsetRandomSampler(train_indices)
-    valid_sampler = SubsetRandomSampler(val_indices)
-
     model = BertAutoEncoder(dataset.vocab_size)
-    state = torch.load('/media/palm/BiggerData/dictionaries/cp/13_4.490292e-05.pth')
+    state = torch.load('/media/palm/BiggerData/dictionaries/cp5/09_4.022677e-05.pth')
     model.load_state_dict(state)
     model.to(device)
     model.eval()

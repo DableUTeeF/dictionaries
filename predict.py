@@ -16,7 +16,7 @@ if __name__ == '__main__':
     train_indices, val_indices = indices[split:], indices[:split]
 
     model = BertAutoEncoder(dataset.vocab_size)
-    pth = '/media/palm/BiggerData/dictionaries/cp7/02_0.0231.pth'
+    pth = '/media/palm/BiggerData/dictionaries/cp8/05_6.0430e-05.pth'
     print(pth)
     state = torch.load(pth)
     model.load_state_dict(state)

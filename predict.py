@@ -19,8 +19,8 @@ if __name__ == '__main__':
     np.random.shuffle(indices)
     train_indices, val_indices = indices[split:], indices[:split]
 
-    model = BertAutoEncoderWithEmb(dataset.vocab_size)
-    pth = '/media/palm/BiggerData/dictionaries/cp9/04_4.2932e-06.pth'
+    model = BertAutoEncoder(dataset.vocab_size)
+    pth = '/media/palm/BiggerData/dictionaries/cp2/05_1.15132e-06.pth'
     print(pth)
     state = torch.load(pth)
     model.load_state_dict(state)
@@ -34,7 +34,7 @@ if __name__ == '__main__':
         out_indexes = [101]
         for i in range(6):
             trg_tensor = torch.LongTensor(out_indexes).unsqueeze(0).to(device)
-            embeded_word = model.embedding(trg_tensor, token_type_ids=torch.zeros_like(trg_tensor)).transpose(0, 1)
+            embeded_word = bert.embeddings(trg_tensor, token_type_ids=torch.zeros_like(trg_tensor)).transpose(0, 1)
             output = model.fc(model.transformer_decoder(embeded_word, memory))
             out_token = output.argmax(2)[-1].item()
             # print(torch.max(output, 2)[0])

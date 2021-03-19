@@ -1,8 +1,7 @@
 """
 todo: 1). Attention mask
-      2). Remove EOS from loss
+      2). Remove EOS from loss - cp3
       3). Extreme large batch size
-
 """
 from datagen import QuoraDataset, SynonymsDataset, WordTriplet, WordDataset, BertDataset
 from models import *
@@ -34,7 +33,7 @@ if __name__ == '__main__':
                                                num_workers=int(device=='cuda')*2,
                                                collate_fn=dataset.collate_fn,
                                                )
-    validation_loader = torch.utils.data.DataLoader(dataset, batch_size=32,
+    validation_loader = torch.utils.data.DataLoader(dataset, batch_size=64,
                                                     sampler=valid_sampler,
                                                     num_workers=2,
                                                     collate_fn=dataset.collate_fn,
@@ -97,5 +96,5 @@ if __name__ == '__main__':
                 the_loss = f'{the_loss:.4f}'
             else:
                 the_loss = f'{the_loss:.4e}'
-            torch.save(model.state_dict(), f"/media/palm/BiggerData/dictionaries/cp1/{epoch:02d}_{the_loss}.pth")
+            torch.save(model.state_dict(), f"/media/palm/BiggerData/dictionaries/cp3/{epoch:02d}_{the_loss}.pth")
         # torch.save(model.state_dict(), f"/media/palm/BiggerData/dictionaries/cp3/last.pth")

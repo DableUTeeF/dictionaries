@@ -2,9 +2,59 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 import math
-from transformers import BertModel
 
-__all__ = ['BertAutoEncoderPretrained', 'BertAutoEncoder', 'BertAutoEncoderOld', 'FocalLoss']
+__all__ = ['BertAutoEncoderWithEmb', 'BertAutoEncoder', 'BertAutoEncoderOld', 'FocalLoss']
+
+class BertEmbeddings(nn.Module):
+    """Construct the embeddings from word, position and token_type embeddings."""
+
+    def __init__(self, vocab_size,
+                 hidden_size,
+                 max_position_embeddings,
+                 pad_token_id,
+                 type_vocab_size,
+                 layer_norm_eps,
+                 hidden_dropout_prob):
+        super().__init__()
+        self.word_embeddings = nn.Embedding(vocab_size, hidden_size, padding_idx=pad_token_id)
+        self.position_embeddings = nn.Embedding(max_position_embeddings, hidden_size)
+        self.token_type_embeddings = nn.Embedding(type_vocab_size, hidden_size)
+
+        # self.LayerNorm is not snake-cased to stick with TensorFlow model variable name and be able to load
+        # any TensorFlow checkpoint file
+        self.LayerNorm = nn.LayerNorm(hidden_size, eps=layer_norm_eps)
+        self.dropout = nn.Dropout(hidden_dropout_prob)
+
+        # position_ids (1, len position emb) is contiguous in memory and exported when serialized
+        self.register_buffer("position_ids", torch.arange(max_position_embeddings).expand((1, -1)))
+        self.position_embedding_type = "absolute"
+
+    def forward(self, input_ids=None, token_type_ids=None, position_ids=None, inputs_embeds=None):
+        if input_ids is not None:
+            input_shape = input_ids.size()
+        else:
+            input_shape = inputs_embeds.size()[:-1]
+
+        seq_length = input_shape[1]
+
+        if position_ids is None:
+            position_ids = self.position_ids[:, :seq_length]
+
+        if token_type_ids is None:
+            token_type_ids = torch.zeros(input_shape, dtype=torch.long, device=self.position_ids.device)
+
+        if inputs_embeds is None:
+            inputs_embeds = self.word_embeddings(input_ids)
+        token_type_embeddings = self.token_type_embeddings(token_type_ids)
+
+        embeddings = inputs_embeds + token_type_embeddings
+        if self.position_embedding_type == "absolute":
+            position_embeddings = self.position_embeddings(position_ids)
+            embeddings += position_embeddings
+        embeddings = self.LayerNorm(embeddings)
+        embeddings = self.dropout(embeddings)
+        return embeddings
+
 
 class FocalLoss(nn.Module):
     def __init__(self, alpha=1, gamma=2, logits=False, reduce=True):
@@ -113,20 +163,19 @@ class BertAutoEncoder(nn.Module):
         self.transformer_decoder = nn.TransformerDecoder(decoder_layer, 2)
         self.fc = nn.Linear(768, vocab_size)
 
-    def forward(self, memory, embedded_word):
-        output = self.transformer_decoder(embedded_word, memory)
+    def forward(self, memory, embedded_word, tgt_mask, memory_mask):
+        output = self.transformer_decoder(embedded_word, memory, tgt_mask=tgt_mask, memory_mask=memory_mask)
         output = self.fc(output)
         return output
 
 
-class BertAutoEncoderPretrained(nn.Module):
-    def __init__(self, vocab_size: int, embedding: torch.nn.Module):
+class BertAutoEncoderWithEmb(nn.Module):
+    def __init__(self, vocab_size: int):
         super().__init__()
         decoder_layer = nn.TransformerDecoderLayer(768, 2, 1024, dropout=0.1)
         self.transformer_decoder = nn.TransformerDecoder(decoder_layer, 2)
         self.fc = nn.Linear(768, vocab_size)
-        self.embedding = embedding
-        self.embedding.requires_grad_(True)
+        self.embedding = BertEmbeddings(vocab_size, 768, 512, 0, 2, 1e-12, 0.1)
 
     def forward(self, memory, word):
         embedded_word = self.embedding(word.data['input_ids'][:, :-1], token_type_ids=word.data['token_type_ids'][:, :-1]).transpose(0, 1)

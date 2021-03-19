@@ -7,6 +7,10 @@ from transformers import BertModel
 
 if __name__ == '__main__':
     device = 'cpu'
+    bert = BertModel.from_pretrained('bert-base-uncased')
+    bert.requires_grad_(False)
+    bert.to(device)
+    bert.eval()
     dataset = BertDataset()
     dataset_size = len(dataset)
     indices = list(range(dataset_size))
@@ -15,12 +19,8 @@ if __name__ == '__main__':
     np.random.shuffle(indices)
     train_indices, val_indices = indices[split:], indices[:split]
 
-    bert = BertModel.from_pretrained('bert-base-uncased')
-    bert.requires_grad_(False)
-    bert.to(device)
-    bert.eval()
-    model = BertAutoEncoderPretrained(dataset.vocab_size, bert.embeddings)
-    pth = '/media/palm/BiggerData/dictionaries/cp9/01_3.4790e-05.pth'
+    model = BertAutoEncoderWithEmb(dataset.vocab_size)
+    pth = '/media/palm/BiggerData/dictionaries/cp9/04_4.2932e-06.pth'
     print(pth)
     state = torch.load(pth)
     model.load_state_dict(state)

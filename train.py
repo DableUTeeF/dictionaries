@@ -3,7 +3,7 @@ todo: 1). Attention mask
       2). Remove EOS from loss - cp3
       3). Extreme large batch size
 """
-from datagen import QuoraDataset, SynonymsDataset, WordTriplet, WordDataset, BertDataset
+from datagen import *
 from models import *
 from torch.utils.data import DataLoader
 import torch
@@ -28,7 +28,7 @@ if __name__ == '__main__':
     train_sampler = SubsetRandomSampler(train_indices)
     valid_sampler = SubsetRandomSampler(val_indices)
 
-    train_loader = torch.utils.data.DataLoader(dataset, batch_size=2,
+    train_loader = torch.utils.data.DataLoader(dataset, batch_size=32,
                                                sampler=train_sampler,
                                                num_workers=int(device=='cuda')*2,
                                                collate_fn=dataset.collate_fn,
@@ -48,7 +48,7 @@ if __name__ == '__main__':
 
     # model = TransformerModel(dataset.vocab_len, dataset.vocab_len, 1024)
     model.to(device)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=2.5e-5)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
     schedule = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=10, min_lr=1e-6)
     criterion = torch.nn.BCEWithLogitsLoss()
     # criterion = FocalLoss(logits=True)
@@ -61,7 +61,7 @@ if __name__ == '__main__':
             src, trg = pos_tokens.to(device), word.to(device)
             memory = bert(**src).last_hidden_state.transpose(0, 1)
             embeded_word = bert.embeddings(trg.data['input_ids'][:, :-1], token_type_ids=trg.data['token_type_ids'][:, :-1]).transpose(0, 1)
-            output = model(memory, embeded_word)
+            output = model(memory, embeded_word, trg.data['attention_mask'][:, :-1].transpose(0, 1).unsqueeze(2), src.data['attention_mask'][:, :-1].transpose(0, 1).unsqueeze(2))
             target = torch.nn.functional.one_hot(trg.data['input_ids'][:, 1:], num_classes=vocabs).float()
             # weight = (torch.FloatTensor(*target.size()).uniform_() < 20/vocabs).float() + 1/vocabs
             # weight = torch.zeros_like(target) + 1/vocabs

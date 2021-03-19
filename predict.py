@@ -1,4 +1,4 @@
-from datagen import QuoraDataset, SynonymsDataset, WordTriplet, WordDataset, BertDataset
+from datagen import *
 from models import *
 import torch
 import numpy as np
@@ -20,7 +20,7 @@ if __name__ == '__main__':
     train_indices, val_indices = indices[split:], indices[:split]
 
     model = BertAutoEncoder(dataset.vocab_size)
-    pth = '/media/palm/BiggerData/dictionaries/cp2/05_1.15132e-06.pth'
+    pth = '/media/palm/BiggerData/dictionaries/cp3/08_1.0651e-06.pth'
     print(pth)
     state = torch.load(pth)
     model.load_state_dict(state)

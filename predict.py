@@ -1,5 +1,5 @@
 from datagen import QuoraDataset, SynonymsDataset, WordTriplet, WordDataset, BertDataset
-from models import TextSentiment, ContrastiveLoss, AutoEncoder, TransformerModel, BertAutoEncoder, BertAutoEncoderOld
+from models import *
 import torch
 import numpy as np
 from transformers import BertModel
@@ -15,17 +15,17 @@ if __name__ == '__main__':
     np.random.shuffle(indices)
     train_indices, val_indices = indices[split:], indices[:split]
 
-    model = BertAutoEncoder(dataset.vocab_size)
-    pth = '/media/palm/BiggerData/dictionaries/cp8/05_6.0430e-05.pth'
+    bert = BertModel.from_pretrained('bert-base-uncased')
+    bert.requires_grad_(False)
+    bert.to(device)
+    bert.eval()
+    model = BertAutoEncoderPretrained(dataset.vocab_size, bert.embeddings)
+    pth = '/media/palm/BiggerData/dictionaries/cp9/01_3.4790e-05.pth'
     print(pth)
     state = torch.load(pth)
     model.load_state_dict(state)
     model.to(device)
     model.eval()
-    bert = BertModel.from_pretrained('bert-base-uncased')
-    bert.requires_grad_(False)
-    bert.to(device)
-    bert.eval()
 
     for idx in val_indices:
         word, pos_tokens = dataset.collate_fn([dataset[idx]])
@@ -33,14 +33,9 @@ if __name__ == '__main__':
         memory = bert(**pos_tokens.to(device)).last_hidden_state.transpose(0, 1)
         out_indexes = [101]
         for i in range(6):
-            if isinstance(model, BertAutoEncoder):
-                trg_tensor = torch.LongTensor(out_indexes).unsqueeze(0).to(device)
-                embeded_word = bert.embeddings(trg_tensor, token_type_ids=torch.zeros_like(trg_tensor)).transpose(0, 1)
-                output = model.fc(model.transformer_decoder(embeded_word, memory))
-            else:
-                trg_tensor = torch.LongTensor(out_indexes).unsqueeze(1).to(device)
-                output = model.pos_decoder(model.decoder(trg_tensor))
-                output = model.fc(model.transformer_decoder(output, memory))
+            trg_tensor = torch.LongTensor(out_indexes).unsqueeze(0).to(device)
+            embeded_word = model.embedding(trg_tensor, token_type_ids=torch.zeros_like(trg_tensor)).transpose(0, 1)
+            output = model.fc(model.transformer_decoder(embeded_word, memory))
             out_token = output.argmax(2)[-1].item()
             # print(torch.max(output, 2)[0])
             out_indexes.append(out_token)

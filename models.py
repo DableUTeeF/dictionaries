@@ -4,6 +4,8 @@ from torch.nn import functional as F
 import math
 from transformers import BertModel
 
+__all__ = ['BertAutoEncoderPretrained', 'BertAutoEncoder', 'BertAutoEncoderOld', 'FocalLoss']
+
 class FocalLoss(nn.Module):
     def __init__(self, alpha=1, gamma=2, logits=False, reduce=True):
         super(FocalLoss, self).__init__()
@@ -112,6 +114,22 @@ class BertAutoEncoder(nn.Module):
         self.fc = nn.Linear(768, vocab_size)
 
     def forward(self, memory, embedded_word):
+        output = self.transformer_decoder(embedded_word, memory)
+        output = self.fc(output)
+        return output
+
+
+class BertAutoEncoderPretrained(nn.Module):
+    def __init__(self, vocab_size: int, embedding: torch.nn.Module):
+        super().__init__()
+        decoder_layer = nn.TransformerDecoderLayer(768, 2, 1024, dropout=0.1)
+        self.transformer_decoder = nn.TransformerDecoder(decoder_layer, 2)
+        self.fc = nn.Linear(768, vocab_size)
+        self.embedding = embedding
+        self.embedding.requires_grad_(True)
+
+    def forward(self, memory, word):
+        embedded_word = self.embedding(word.data['input_ids'][:, :-1], token_type_ids=word.data['token_type_ids'][:, :-1]).transpose(0, 1)
         output = self.transformer_decoder(embedded_word, memory)
         output = self.fc(output)
         return output

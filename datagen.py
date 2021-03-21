@@ -108,7 +108,7 @@ class BertDataset(Dataset):
         self.words = []
         for word in words:
             meanings = wn.synsets(word)
-            # word = word.replace('_', ' ')
+            word = word.replace('_', ' ')
             for meaning in meanings:
                 self.words.append((word, meaning.definition()))
         self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
@@ -126,10 +126,10 @@ class BertDataset(Dataset):
         word = [entry[0] for entry in batch]
         text = self.tokenizer(text, return_tensors='pt', padding=True)
         word = self.tokenizer(word, return_tensors='pt', padding=True)
-        text.data['attention_mask'][text.data['input_ids'] == 102] = 0
-        text.data['input_ids'][text.data['input_ids'] == 102] = 0
-        word.data['attention_mask'][word.data['input_ids'] == 102] = 0
-        word.data['input_ids'][word.data['input_ids'] == 102] = 0
+        # text.data['attention_mask'][text.data['input_ids'] == 102] = 0
+        # text.data['input_ids'][text.data['input_ids'] == 102] = 0
+        # word.data['attention_mask'][word.data['input_ids'] == 102] = 0
+        # word.data['input_ids'][word.data['input_ids'] == 102] = 0
         return word, text
 
 

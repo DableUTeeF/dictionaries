@@ -14,7 +14,6 @@ import numpy as np
 from transformers import BertModel
 import os
 
-
 if __name__ == '__main__':
     device = 'cuda'
     dataset = BertDataset()
@@ -31,7 +30,7 @@ if __name__ == '__main__':
 
     train_loader = torch.utils.data.DataLoader(dataset, batch_size=32,
                                                sampler=train_sampler,
-                                               num_workers=int(device=='cuda')*2,
+                                               num_workers=int(device == 'cuda') * 2,
                                                collate_fn=dataset.collate_fn,
                                                )
     validation_loader = torch.utils.data.DataLoader(dataset, batch_size=64,
@@ -58,7 +57,7 @@ if __name__ == '__main__':
         model.train()
         progbar = tf.keras.utils.Progbar(len(train_loader),
                                          stateful_metrics=['current_loss'])
-        for idx, (word, pos_tokens, ) in enumerate(train_loader):
+        for idx, (word, pos_tokens,) in enumerate(train_loader):
             src, trg = pos_tokens.to(device), word.to(device)
             memory = bert(**src).last_hidden_state.transpose(0, 1)
             # memory_mask = torch.zeros_like(memory)
@@ -66,15 +65,18 @@ if __name__ == '__main__':
             embeded_word = bert.embeddings(trg.data['input_ids'][:, :-1], token_type_ids=trg.data['token_type_ids'][:, :-1]).transpose(0, 1)
             # tgt_mask = torch.zeros_like(embeded_word)
             # tgt_mask[trg.data['attention_mask'][:, :-1].transpose(0, 1)==1] = 1
-            output = model(memory, embeded_word, (1-trg.data['attention_mask'][:, :-1]).bool(), (1-src.data['attention_mask']).bool())
+            output = model(memory, embeded_word)
             target = torch.nn.functional.one_hot(trg.data['input_ids'][:, 1:], num_classes=vocabs).float()
             # weight = (torch.FloatTensor(*target.size()).uniform_() < 20/vocabs).float() + 1/vocabs
             # weight = torch.zeros_like(target) + 1/vocabs
             # weight[target == 1] = 1
-            # loss = torch.nn.functional.binary_cross_entropy_with_logits(output.transpose(0, 1).transpose(1, 2),
-            #                                                             target.transpose(1, 2).to(device),
-            #                                                             weight.transpose(1, 2).to(device))
-            loss = criterion(output.transpose(0, 1), target)
+            weight = torch.ones_like(target)
+            weight[trg.data['attention_mask'][:, 1:] == 0] = 0
+            weight[trg.data['input_ids'][:, 1:] == 102] = 0
+            loss = torch.nn.functional.binary_cross_entropy_with_logits(output.transpose(0, 1).transpose(1, 2),
+                                                                        target.transpose(1, 2).to(device),
+                                                                        weight.transpose(1, 2).to(device))
+            # loss = criterion(output.transpose(0, 1), target)
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
@@ -88,17 +90,23 @@ if __name__ == '__main__':
                                          stateful_metrics=['current_loss'])
         min_loss = 100
         with torch.no_grad():
-            for idx, (word, pos_tokens, ) in enumerate(validation_loader):
+            for idx, (word, pos_tokens,) in enumerate(validation_loader):
                 src, trg = pos_tokens.to(device), word.to(device)
                 memory = bert(**src).last_hidden_state.transpose(0, 1)
                 embeded_word = bert.embeddings(trg.data['input_ids'][:, :-1], token_type_ids=trg.data['token_type_ids'][:, :-1]).transpose(0, 1)
                 output = model(memory, embeded_word)
                 target = torch.nn.functional.one_hot(trg.data['input_ids'][:, 1:], num_classes=vocabs).float()
-                loss = criterion(output.transpose(0, 1).transpose(1, 2), target.transpose(1, 2))
+                weight = torch.ones_like(target)
+                weight[trg.data['attention_mask'][:, 1:] == 0] = 0
+                weight[trg.data['input_ids'][:, 1:] == 102] = 0
+                loss = torch.nn.functional.binary_cross_entropy_with_logits(output.transpose(0, 1).transpose(1, 2),
+                                                                            target.transpose(1, 2).to(device),
+                                                                            weight.transpose(1, 2).to(device))
+                # loss = criterion(output.transpose(0, 1).transpose(1, 2), target.transpose(1, 2))
                 progbar.update(idx + 1, [('val_loss', loss.detach().item()),
                                          ('current_loss', loss.detach().item())])
-        # if epoch % 10 == 1:
-            the_loss = progbar._values['val_loss'][0]/progbar._values['val_loss'][1]
+            # if epoch % 10 == 1:
+            the_loss = progbar._values['val_loss'][0] / progbar._values['val_loss'][1]
             if abs(the_loss) > 1e-3:
                 the_loss = f'{the_loss:.4f}'
             else:

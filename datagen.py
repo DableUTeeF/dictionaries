@@ -126,6 +126,10 @@ class BertDataset(Dataset):
         word = [entry[0] for entry in batch]
         text = self.tokenizer(text, return_tensors='pt', padding=True)
         word = self.tokenizer(word, return_tensors='pt', padding=True)
+        text.data['attention_mask'][text.data['input_ids'] == 102] = 0
+        text.data['input_ids'][text.data['input_ids'] == 102] = 0
+        word.data['attention_mask'][word.data['input_ids'] == 102] = 0
+        word.data['input_ids'][word.data['input_ids'] == 102] = 0
         return word, text
 
 

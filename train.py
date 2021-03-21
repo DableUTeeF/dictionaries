@@ -1,7 +1,8 @@
 """
-todo: 1). Attention mask
-      2). Remove EOS from loss - cp3
+todo: 1). Attention mask - cp8(with eos removed)
+      2). Remove EOS - cp3
       3). Extreme large batch size - cp4
+      4). Weight EOS and PAD to 0 in loss - cp8
 """
 from datagen import *
 from models import *
@@ -60,8 +61,12 @@ if __name__ == '__main__':
         for idx, (word, pos_tokens, ) in enumerate(train_loader):
             src, trg = pos_tokens.to(device), word.to(device)
             memory = bert(**src).last_hidden_state.transpose(0, 1)
+            # memory_mask = torch.zeros_like(memory)
+            # memory_mask[src.data['attention_mask'].transpose(0, 1) == 1] = 1
             embeded_word = bert.embeddings(trg.data['input_ids'][:, :-1], token_type_ids=trg.data['token_type_ids'][:, :-1]).transpose(0, 1)
-            output = model(memory, embeded_word)
+            # tgt_mask = torch.zeros_like(embeded_word)
+            # tgt_mask[trg.data['attention_mask'][:, :-1].transpose(0, 1)==1] = 1
+            output = model(memory, embeded_word, (1-trg.data['attention_mask'][:, :-1]).bool(), (1-src.data['attention_mask']).bool())
             target = torch.nn.functional.one_hot(trg.data['input_ids'][:, 1:], num_classes=vocabs).float()
             # weight = (torch.FloatTensor(*target.size()).uniform_() < 20/vocabs).float() + 1/vocabs
             # weight = torch.zeros_like(target) + 1/vocabs
@@ -69,11 +74,10 @@ if __name__ == '__main__':
             # loss = torch.nn.functional.binary_cross_entropy_with_logits(output.transpose(0, 1).transpose(1, 2),
             #                                                             target.transpose(1, 2).to(device),
             #                                                             weight.transpose(1, 2).to(device))
-            loss = criterion(output.transpose(0, 1), target) / 32
+            loss = criterion(output.transpose(0, 1), target)
             loss.backward()
-            if (idx + 1) % 32 == 0:
-                optimizer.step()
-                optimizer.zero_grad()
+            optimizer.step()
+            optimizer.zero_grad()
             progbar.update(idx + 1, [('loss', loss.detach().item()),
                                      ('current_loss', loss.detach().item())])
         optimizer.step()
@@ -99,5 +103,5 @@ if __name__ == '__main__':
                 the_loss = f'{the_loss:.4f}'
             else:
                 the_loss = f'{the_loss:.4e}'
-            torch.save(model.state_dict(), f"/media/palm/BiggerData/dictionaries/cp7/{epoch:02d}_{the_loss}.pth")
+            torch.save(model.state_dict(), f"/media/palm/BiggerData/dictionaries/cp8/{epoch:02d}_{the_loss}.pth")
         # torch.save(model.state_dict(), f"/media/palm/BiggerData/dictionaries/cp3/last.pth")

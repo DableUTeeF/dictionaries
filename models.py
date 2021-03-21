@@ -164,7 +164,7 @@ class BertAutoEncoder(nn.Module):
         self.fc = nn.Linear(768, vocab_size)
 
     def forward(self, memory, embedded_word, tgt_mask=None, memory_mask=None):
-        output = self.transformer_decoder(embedded_word, memory, tgt_mask=tgt_mask, memory_mask=memory_mask)
+        output = self.transformer_decoder(embedded_word, memory, tgt_key_padding_mask=tgt_mask, memory_key_padding_mask=memory_mask)
         output = self.fc(output)
         return output
 

@@ -104,14 +104,14 @@ class SynonymsDataset(Dataset):
 
 class BertDataset(Dataset):
     def __init__(self):
-        words = list(set(i for i in wn.words()))
+        self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+        words = [w for w in list(set(i for i in wn.words())) if len(self.tokenizer([w]).data['input_ids'][0]) == 3]
         self.words = []
         for word in words:
             meanings = wn.synsets(word)
             word = word.replace('_', ' ')
             for meaning in meanings:
                 self.words.append((word, meaning.definition()))
-        self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
         self.vocab_size = self.tokenizer.vocab_size
 
     def __len__(self):
@@ -131,6 +131,11 @@ class BertDataset(Dataset):
         # word.data['attention_mask'][word.data['input_ids'] == 102] = 0
         # word.data['input_ids'][word.data['input_ids'] == 102] = 0
         return word, text
+
+
+class ThaiWordDataset(Dataset):
+    def __init__(self):
+        self.patterns = [r'\([^)]*\)', r'\[[^)]*\]', r'&#[a-z\d]*;', r'<\/[a-z\d]{1,6}>', r'<[a-z\d]{1,6}>']
 
 
 class WordDataset(Dataset):

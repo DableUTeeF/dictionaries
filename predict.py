@@ -20,14 +20,14 @@ if __name__ == '__main__':
     train_indices, val_indices = indices[split:], indices[:split]
 
     model = BertAutoEncoder(dataset.vocab_size)
-    pth = '/media/palm/BiggerData/dictionaries/cp8/01_4.4971e-06.pth'
+    pth = '/media/palm/BiggerData/dictionaries/cp8/14_1.0328e-06.pth'
     print(pth)
     state = torch.load(pth)
     model.load_state_dict(state)
     model.to(device)
     model.eval()
 
-    for idx in train_indices:
+    for idx in val_indices:
         word, pos_tokens = dataset.collate_fn([dataset[idx]])
 
         memory = bert(**pos_tokens.to(device)).last_hidden_state.transpose(0, 1)

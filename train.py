@@ -2,7 +2,7 @@
 todo: 1). Attention mask - cp8(with eos removed)
       2). Remove EOS - cp3
       3). Extreme large batch size - cp4
-      4). Weight EOS and PAD to 0 in loss - cp8
+      4). Weight EOS and PAD to 0 in loss - cp8 - cp9
 """
 from datagen import *
 from models import *
@@ -77,9 +77,11 @@ if __name__ == '__main__':
                                                                         target.transpose(1, 2).to(device),
                                                                         weight.transpose(1, 2).to(device))
             # loss = criterion(output.transpose(0, 1), target)
+            loss /= 32
             loss.backward()
-            optimizer.step()
-            optimizer.zero_grad()
+            if (idx + 1) % 32 == 0:
+                optimizer.step()
+                optimizer.zero_grad()
             progbar.update(idx + 1, [('loss', loss.detach().item()),
                                      ('current_loss', loss.detach().item())])
         optimizer.step()

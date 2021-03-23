@@ -7,9 +7,9 @@ from torch.utils.data.sampler import SubsetRandomSampler
 import numpy as np
 import pandas as pd
 import re
-from transformers import BertTokenizer
+from transformers import AutoTokenizer
 
-__all__ = ['BertDataset']
+__all__ = ['BertDataset', 'ThaiBertDataset']
 
 def generate_batch(batch):
     text = [entry[0] for entry in batch]
@@ -104,12 +104,13 @@ class SynonymsDataset(Dataset):
 
 class BertDataset(Dataset):
     def __init__(self):
-        self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+        # words = list(set(i for i in wn.words()))
+        self.tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased')
         words = [w for w in list(set(i for i in wn.words())) if len(self.tokenizer([w]).data['input_ids'][0]) == 3]
         self.words = []
         for word in words:
             meanings = wn.synsets(word)
-            word = word.replace('_', ' ')
+            # word = word.replace('_', ' ')
             for meaning in meanings:
                 self.words.append((word, meaning.definition()))
         self.vocab_size = self.tokenizer.vocab_size
@@ -133,9 +134,32 @@ class BertDataset(Dataset):
         return word, text
 
 
-class ThaiWordDataset(Dataset):
+class ThaiBertDataset(Dataset):
     def __init__(self):
         self.patterns = [r'\([^)]*\)', r'\[[^)]*\]', r'&#[a-z\d]*;', r'<\/[a-z\d]{1,6}>', r'<[a-z\d]{1,6}>']
+        self.tokenizer = AutoTokenizer.from_pretrained('mrm8488/bert-multi-cased-finedtuned-xquad-tydiqa-goldp')
+        self.df = pd.read_csv('data/dictdb_th_en.csv', sep=';')
+        self.vocab_size = self.tokenizer.vocab_size
+
+    def __len__(self):
+        return len(self.df)
+
+    def __getitem__(self, index):
+        row = self.df.iloc[index]
+        word = row.sentry
+        text = row.sdef
+        return word, text
+
+    def collate_fn(self, batch):
+        text = [entry[1] for entry in batch]
+        word = [entry[0] for entry in batch]
+        text = self.tokenizer(text, return_tensors='pt', padding=True)
+        word = self.tokenizer(word, return_tensors='pt', padding=True)
+        # text.data['attention_mask'][text.data['input_ids'] == 102] = 0
+        # text.data['input_ids'][text.data['input_ids'] == 102] = 0
+        # word.data['attention_mask'][word.data['input_ids'] == 102] = 0
+        # word.data['input_ids'][word.data['input_ids'] == 102] = 0
+        return word, text
 
 
 class WordDataset(Dataset):

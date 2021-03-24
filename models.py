@@ -194,7 +194,7 @@ class BertAutoEncoderOld(nn.Module):
         self.fc = nn.Linear(768, vocab_size)
 
     def forward(self, memory, word):
-        tgt = self.decoder(word.data['input_ids'][:, :-1].transpose(0, 1))
+        tgt = self.decoder(word.data[:, :-1].transpose(0, 1))
         tgt = self.pos_decoder(tgt)
         output = self.transformer_decoder(tgt, memory)
         output = self.fc(output)

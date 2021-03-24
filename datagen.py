@@ -8,8 +8,13 @@ import numpy as np
 import pandas as pd
 import re
 from transformers import AutoTokenizer
+import collections
+from bert.bpe_helper import BPE
+import sentencepiece as spm
 
-__all__ = ['BertDataset', 'ThaiBertDataset']
+
+__all__ = ['BertDataset', 'ThaiBertDataset', 'ThaiTokenizer']
+
 
 def generate_batch(batch):
     text = [entry[0] for entry in batch]
@@ -103,7 +108,7 @@ class SynonymsDataset(Dataset):
 
 
 class BertDataset(Dataset):
-    def __init__(self):
+    def __init__(self, reverse=False):
         # words = list(set(i for i in wn.words()))
         self.tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased')
         words = [w for w in list(set(i for i in wn.words())) if len(self.tokenizer([w]).data['input_ids'][0]) == 3]
@@ -113,7 +118,11 @@ class BertDataset(Dataset):
             # word = word.replace('_', ' ')
             for meaning in meanings:
                 self.words.append((word, meaning.definition()))
+                if reverse:
+                    break
         self.vocab_size = self.tokenizer.vocab_size
+        self.cls = 101
+        self.sep = 102
 
     def __len__(self):
         return len(self.words)
@@ -121,6 +130,9 @@ class BertDataset(Dataset):
     def __getitem__(self, index):
         word, text = self.words[index]
         return word, text
+
+    def decode(self, text):
+        return self.tokenizer.decode(text)
 
     def collate_fn(self, batch):
         text = [entry[1] for entry in batch]
@@ -134,12 +146,93 @@ class BertDataset(Dataset):
         return word, text
 
 
+def convert_to_unicode(text):
+    """Converts `text` to Unicode (if it's not already), assuming utf-8 input."""
+    if isinstance(text, str):
+        return text
+    elif isinstance(text, bytes):
+        return text.decode("utf-8", "ignore")
+    else:
+        raise ValueError("Unsupported string type: %s" % (type(text)))
+
+
+def load_vocab(vocab_file):
+    vocab = collections.OrderedDict()
+    index = 0
+    with open(vocab_file, "r") as reader:
+        while True:
+            token = reader.readline()
+            if token.split(): token = token.split()[0] # to support SentencePiece vocab file
+            token = convert_to_unicode(token)
+            if not token:
+                break
+            token = token.strip()
+            vocab[token] = index
+            index += 1
+    return vocab
+
+
+def convert_by_vocab(vocab, items):
+    output = []
+    for item in items:
+        output.append(vocab[item])
+    return output
+
+
+class ThaiTokenizer(object):
+    """Tokenizes Thai texts."""
+
+    def __init__(self, vocab_file, spm_file):
+        self.vocab = load_vocab(vocab_file)
+        self.inv_vocab = {v: k for k, v in self.vocab.items()}
+
+        self.bpe = BPE(vocab_file)
+        self.s = spm.SentencePieceProcessor()
+        self.s.Load(spm_file)
+        self.vocab_size = len(self.vocab)
+
+    def tokenize(self, text):
+        bpe_tokens = self.bpe.encode(text).split(' ')
+        spm_tokens = self.s.EncodeAsPieces(text)
+
+        tokens = bpe_tokens if len(bpe_tokens) < len(spm_tokens) else spm_tokens
+
+        split_tokens = []
+
+        for token in tokens:
+            new_token = token
+
+            if token.startswith('_') and not token in self.vocab:
+                split_tokens.append('_')
+                new_token = token[1:]
+
+            if not new_token in self.vocab:
+                split_tokens.append('<unk>')
+            else:
+                split_tokens.append(new_token)
+
+        return split_tokens
+
+    def __call__(self, text):
+        return [1] + self.convert_tokens_to_ids(self.tokenize(text)) + [2]
+
+    def convert_tokens_to_ids(self, tokens):
+        return convert_by_vocab(self.vocab, tokens)
+
+    def convert_ids_to_tokens(self, ids):
+        return convert_by_vocab(self.inv_vocab, ids)
+
+
 class ThaiBertDataset(Dataset):
     def __init__(self):
         self.patterns = [r'\([^)]*\)', r'\[[^)]*\]', r'&#[a-z\d]*;', r'<\/[a-z\d]{1,6}>', r'<[a-z\d]{1,6}>']
-        self.tokenizer = AutoTokenizer.from_pretrained('mrm8488/bert-multi-cased-finedtuned-xquad-tydiqa-goldp')
+        self.tokenizer = ThaiTokenizer(vocab_file='data/th_wiki_bpe/th.wiki.bpe.op25000.vocab', spm_file='data/th_wiki_bpe/th.wiki.bpe.op25000.model')
         self.df = pd.read_csv('data/dictdb_th_en.csv', sep=';')
-        self.vocab_size = self.tokenizer.vocab_size
+        self.target = pd.unique(self.df.sentry)
+        self.targetid = {k: v for v, k in enumerate(self.target)}
+        self.vocab_size = len(self.targetid)
+        self.cls = 1
+        self.sep = 2
 
     def __len__(self):
         return len(self.df)
@@ -153,12 +246,10 @@ class ThaiBertDataset(Dataset):
     def collate_fn(self, batch):
         text = [entry[1] for entry in batch]
         word = [entry[0] for entry in batch]
-        text = self.tokenizer(text, return_tensors='pt', padding=True)
-        word = self.tokenizer(word, return_tensors='pt', padding=True)
-        # text.data['attention_mask'][text.data['input_ids'] == 102] = 0
-        # text.data['input_ids'][text.data['input_ids'] == 102] = 0
-        # word.data['attention_mask'][word.data['input_ids'] == 102] = 0
-        # word.data['input_ids'][word.data['input_ids'] == 102] = 0
+        # text = self.thai_tokenizer(text)
+        # word = self.thai_tokenizer(word)
+        text = pad_sequence([torch.tensor(self.tokenizer(t)) for t in text], True)
+        word = pad_sequence([torch.tensor([1, self.targetid[w], 2]) for w in word], True)
         return word, text
 
 

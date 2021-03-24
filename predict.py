@@ -11,7 +11,7 @@ from transformers import BertModel
 
 if __name__ == '__main__':
     device = 'cpu'
-    bert = BertModel.from_pretrained('mrm8488/bert-multi-cased-finedtuned-xquad-tydiqa-goldp')
+    bert = BertModel.from_pretrained('monsoon-nlp/bert-base-thai')
     bert.requires_grad_(False)
     bert.to(device)
     bert.eval()
@@ -24,7 +24,7 @@ if __name__ == '__main__':
     train_indices, val_indices = indices[split:], indices[:split]
 
     model = BertAutoEncoderOld(dataset.vocab_size)
-    pth = '/media/palm/BiggerData/dictionaries/cp12/033_4.8624e-07.pth'
+    pth = '/media/palm/BiggerData/dictionaries/cp12/065_3.4351e-04.pth'
     print(pth)
     state = torch.load(pth, map_location='cpu')
     model.load_state_dict(state)
@@ -34,8 +34,8 @@ if __name__ == '__main__':
     for idx in val_indices:
         word, pos_tokens = dataset.collate_fn([dataset[idx]])
 
-        memory = bert(**pos_tokens.to(device)).last_hidden_state.transpose(0, 1)
-        out_indexes = [101]
+        memory = bert(pos_tokens.to(device)).last_hidden_state.transpose(0, 1)
+        out_indexes = [dataset.cls]
         for i in range(6):
             # trg_tensor = torch.LongTensor(out_indexes).unsqueeze(0).to(device)
             # embeded_word = bert.embeddings(trg_tensor, token_type_ids=torch.zeros_like(trg_tensor)).transpose(0, 1)
@@ -46,10 +46,11 @@ if __name__ == '__main__':
             out_token = output.argmax(2)[-1].item()
             # print(torch.max(output, 2)[0])
             out_indexes.append(out_token)
-            if out_token == 102:
+            if out_token == dataset.sep:
                 break
-        print(dataset.tokenizer.decode(pos_tokens.data['input_ids'][0]))
-        print(dataset.tokenizer.decode(out_indexes), dataset.tokenizer.decode(word.data['input_ids'][0]))
+        print(out_indexes, word)
+        # print(dataset.tokenizer.decode(pos_tokens.data['input_ids'][0]))
+        # print(dataset.tokenizer.decode(out_indexes), dataset.tokenizer.decode(word.data['input_ids'][0]))
 
         # y_text = model(pos_tokens.unsqueeze(1).to(device), word.unsqueeze(1).to(device))
         # # print([dataset.vocab.itos[i] for i in pos_tokens])

@@ -13,10 +13,10 @@ import tensorflow as tf
 from torch.utils.data.sampler import SubsetRandomSampler
 import numpy as np
 from transformers import BertModel
-import os
+
 
 if __name__ == '__main__':
-    grad_accum = 2
+    grad_accum = 1
     device = 'cuda'
     dataset = ThaiBertDataset()
     vocabs = dataset.vocab_size
@@ -30,28 +30,28 @@ if __name__ == '__main__':
     train_sampler = SubsetRandomSampler(train_indices)
     valid_sampler = SubsetRandomSampler(val_indices)
 
-    train_loader = torch.utils.data.DataLoader(dataset, batch_size=16,
+    train_loader = torch.utils.data.DataLoader(dataset, batch_size=32,
                                                sampler=train_sampler,
                                                num_workers=int(device == 'cuda') * 2,
                                                collate_fn=dataset.collate_fn,
                                                )
-    validation_loader = torch.utils.data.DataLoader(dataset, batch_size=16,
+    validation_loader = torch.utils.data.DataLoader(dataset, batch_size=32,
                                                     sampler=valid_sampler,
                                                     num_workers=2,
                                                     collate_fn=dataset.collate_fn,
                                                     )
-    bert = BertModel.from_pretrained('mrm8488/bert-multi-cased-finedtuned-xquad-tydiqa-goldp')
+    bert = BertModel.from_pretrained('monsoon-nlp/bert-base-thai')
     bert.requires_grad_(False)
     bert.to(device)
     model = BertAutoEncoderOld(dataset.vocab_size)
 
-    # state = torch.load('/media/palm/BiggerData/dictionaries/cp10/199_1.2284e-04.pth')
+    # state = torch.load('/media/palm/BiggerData/dictionaries/cp12/199_1.9468e-05.pth')
     # model.load_state_dict(state)
 
     # model = TransformerModel(dataset.vocab_len, dataset.vocab_len, 1024)
     model.to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
-    schedule = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=10, min_lr=1e-6)
+    schedule = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=2, min_lr=1e-8, verbose=True)
     criterion = torch.nn.BCEWithLogitsLoss()
     # criterion = FocalLoss(logits=True)
     for epoch in range(100):
@@ -61,14 +61,15 @@ if __name__ == '__main__':
                                          stateful_metrics=['current_loss'])
         for idx, (word, pos_tokens,) in enumerate(train_loader):
             src, trg = pos_tokens.to(device), word.to(device)
-            memory = bert(**src).last_hidden_state.transpose(0, 1)
+            # todo: add src = src.data['input_ids']
+            memory = bert(src).last_hidden_state.transpose(0, 1)
             # memory_mask = torch.zeros_like(memory)
             # memory_mask[src.data['attention_mask'].transpose(0, 1) == 1] = 1
             # embeded_word = bert.embeddings(trg.data['input_ids'][:, :-1], token_type_ids=trg.data['token_type_ids'][:, :-1]).transpose(0, 1)
             # tgt_mask = torch.zeros_like(embeded_word)
             # tgt_mask[trg.data['attention_mask'][:, :-1].transpose(0, 1)==1] = 1
             output = model(memory, trg)
-            target = torch.nn.functional.one_hot(trg.data['input_ids'][:, 1:], num_classes=vocabs).float()
+            target = torch.nn.functional.one_hot(trg[:, 1:], num_classes=vocabs).float()
             # weight = (torch.FloatTensor(*target.size()).uniform_() < 20/vocabs).float() + 1/vocabs
             # weight = torch.zeros_like(target) + 1/vocabs
             # weight[target == 1] = 1
@@ -96,10 +97,10 @@ if __name__ == '__main__':
         with torch.no_grad():
             for idx, (word, pos_tokens,) in enumerate(validation_loader):
                 src, trg = pos_tokens.to(device), word.to(device)
-                memory = bert(**src).last_hidden_state.transpose(0, 1)
+                memory = bert(src).last_hidden_state.transpose(0, 1)
                 # embeded_word = bert.embeddings(trg.data['input_ids'][:, :-1], token_type_ids=trg.data['token_type_ids'][:, :-1]).transpose(0, 1)
                 output = model(memory, trg)
-                target = torch.nn.functional.one_hot(trg.data['input_ids'][:, 1:], num_classes=vocabs).float()
+                target = torch.nn.functional.one_hot(trg[:, 1:], num_classes=vocabs).float()
                 # weight = torch.ones_like(target)
                 # weight[trg.data['attention_mask'][:, 1:] == 0] = 0
                 # weight[trg.data['input_ids'][:, 1:] == 102] = 0

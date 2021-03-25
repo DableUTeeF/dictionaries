@@ -45,7 +45,7 @@ if __name__ == '__main__':
     bert.to(device)
     model = BertAutoEncoderOld(dataset.vocab_size)
 
-    # state = torch.load('/media/palm/BiggerData/dictionaries/cp12/199_1.9468e-05.pth')
+    # state = torch.load('/media/palm/BiggerData/dictionaries/cp13/007_2.8692e-04.pth')
     # model.load_state_dict(state)
 
     # model = TransformerModel(dataset.vocab_len, dataset.vocab_len, 1024)
@@ -116,5 +116,5 @@ if __name__ == '__main__':
                 the_loss = f'{the_loss:.4f}'
             else:
                 the_loss = f'{the_loss:.4e}'
-            torch.save(model.state_dict(), f"/media/palm/BiggerData/dictionaries/cp12/{epoch:03d}_{the_loss}.pth")
+            torch.save(model.state_dict(), f"/media/palm/BiggerData/dictionaries/cp13/{epoch:03d}_{the_loss}.pth")
         # torch.save(model.state_dict(), f"/media/palm/BiggerData/dictionaries/cp3/last.pth")

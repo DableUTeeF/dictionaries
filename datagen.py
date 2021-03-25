@@ -219,7 +219,7 @@ class ThaiTokenizer(object):
     def convert_tokens_to_ids(self, tokens):
         return convert_by_vocab(self.vocab, tokens)
 
-    def convert_ids_to_tokens(self, ids):
+    def decode(self, ids):
         return convert_by_vocab(self.inv_vocab, ids)
 
 
@@ -229,7 +229,10 @@ class ThaiBertDataset(Dataset):
         self.tokenizer = ThaiTokenizer(vocab_file='data/th_wiki_bpe/th.wiki.bpe.op25000.vocab', spm_file='data/th_wiki_bpe/th.wiki.bpe.op25000.model')
         self.df = pd.read_csv('data/dictdb_th_en.csv', sep=';')
         self.target = pd.unique(self.df.sentry)
-        self.targetid = {k: v for v, k in enumerate(self.target)}
+        self.targetid = {k: v+2 for v, k in enumerate(self.target)}
+        self.targetid['[PAD]'] = 0
+        self.targetid['[CLS]'] = 1
+        self.targetid['[SEP]'] = 2
         self.vocab_size = len(self.targetid)
         self.cls = 1
         self.sep = 2

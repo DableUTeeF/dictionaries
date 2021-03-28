@@ -13,7 +13,7 @@ from bert.bpe_helper import BPE
 import sentencepiece as spm
 
 
-__all__ = ['BertDataset', 'ThaiBertDataset', 'ThaiTokenizer']
+__all__ = ['BertDataset', 'ThaiBertDataset', 'ThaiTokenizer', 'RoyinDataset']
 
 
 def generate_batch(batch):
@@ -221,6 +221,44 @@ class ThaiTokenizer(object):
 
     def decode(self, ids):
         return convert_by_vocab(self.inv_vocab, ids)
+
+
+class RoyinDataset(Dataset):
+    def __init__(self):
+        self.patterns = [r'\([^)]*\)', r'\[[^)]*\]', r'&#[a-z\d]*;', r'<\/[a-z\d]{1,6}>', r'<[a-z\d]{1,6}>']
+        self.df = pd.read_csv('data/royin_dict_2542.tsv', sep='\t')
+        self.tokenizer = ThaiTokenizer(vocab_file='data/th_wiki_bpe/th.wiki.bpe.op25000.vocab', spm_file='data/th_wiki_bpe/th.wiki.bpe.op25000.model')
+        self.target = {'[PAD]', '[CLS]', '[SEP]'}
+        for word in self.df.Word1:
+            w = word.split(',')[0]
+            self.target.add(w)
+        self.target = sorted(self.target)
+        self.targetid = {k: v for v, k in enumerate(self.target)}
+        self.vocab_size = len(self.targetid)
+        self.cls = 1
+        self.sep = 2
+
+    def __len__(self):
+        return len(self.df)
+
+    def __getitem__(self, index):
+        row = self.df.iloc[index]
+        word = row.Word1.split(',')[0]
+        text = row.Definition
+        for pattern in self.patterns:
+            text = re.sub(pattern, '', text)
+        if len(text) > 512:
+            text = text[:512]
+        return word, text
+
+    def collate_fn(self, batch):
+        text = [entry[1] for entry in batch]
+        word = [entry[0] for entry in batch]
+        # text = self.thai_tokenizer(text)
+        # word = self.thai_tokenizer(word)
+        text = pad_sequence([torch.tensor(self.tokenizer(t)) for t in text], True)
+        word = pad_sequence([torch.tensor([1, self.targetid[w], 2]) for w in word], True)
+        return word, text
 
 
 class ThaiBertDataset(Dataset):

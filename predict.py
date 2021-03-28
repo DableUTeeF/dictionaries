@@ -15,7 +15,7 @@ if __name__ == '__main__':
     bert.requires_grad_(False)
     bert.to(device)
     bert.eval()
-    dataset = ThaiBertDataset()
+    dataset = RoyinDataset()
     dataset_size = len(dataset)
     indices = list(range(dataset_size))
     split = int(np.floor(0.2 * dataset_size))
@@ -24,7 +24,7 @@ if __name__ == '__main__':
     train_indices, val_indices = indices[split:], indices[:split]
 
     model = BertAutoEncoderOld(dataset.vocab_size)
-    pth = '/media/palm/BiggerData/dictionaries/cp13/029_2.6105e-04.pth'
+    pth = '/media/palm/BiggerData/dictionaries/cp14/027_2.1747e-05.pth'
     print(pth)
     state = torch.load(pth, map_location='cpu')
     model.load_state_dict(state)
@@ -49,7 +49,7 @@ if __name__ == '__main__':
             if out_token == dataset.sep:
                 break
         print(''.join(dataset.tokenizer.decode(pos_tokens[0].tolist())))
-        print(([dataset.target[i+2] for i in out_indexes]), ([dataset.target[i+2] for i in word]))
+        print(([dataset.target[i] for i in out_indexes]), ([dataset.target[i] for i in word[0]]))
         # print(dataset.tokenizer.decode(pos_tokens.data['input_ids'][0]))
         # print(dataset.tokenizer.decode(out_indexes), dataset.tokenizer.decode(word.data['input_ids'][0]))
 

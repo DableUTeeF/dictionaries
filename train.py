@@ -18,7 +18,7 @@ from transformers import BertModel
 if __name__ == '__main__':
     grad_accum = 1
     device = 'cuda'
-    dataset = ThaiBertDataset()
+    dataset = RoyinDataset()
     vocabs = dataset.vocab_size
     dataset_size = len(dataset)
     indices = list(range(dataset_size))
@@ -27,7 +27,7 @@ if __name__ == '__main__':
     np.random.shuffle(indices)
     train_indices, val_indices = indices[split:], indices[:split]
 
-    train_sampler = SubsetRandomSampler(train_indices)
+    train_sampler = SubsetRandomSampler(train_indices+val_indices)
     valid_sampler = SubsetRandomSampler(val_indices)
 
     train_loader = torch.utils.data.DataLoader(dataset, batch_size=32,
@@ -116,5 +116,5 @@ if __name__ == '__main__':
                 the_loss = f'{the_loss:.4f}'
             else:
                 the_loss = f'{the_loss:.4e}'
-            torch.save(model.state_dict(), f"/media/palm/BiggerData/dictionaries/cp13/{epoch:03d}_{the_loss}.pth")
+            torch.save(model.state_dict(), f"/media/palm/BiggerData/dictionaries/cp14/{epoch:03d}_{the_loss}.pth")
         # torch.save(model.state_dict(), f"/media/palm/BiggerData/dictionaries/cp3/last.pth")

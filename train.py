@@ -5,6 +5,9 @@ todo: 1). Attention mask - cp8(with eos removed)
       4). Weight EOS and PAD to 0 in loss - cp8 - cp9
       5). Thai - cp12
 """
+import os
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
 from datagen import *
 from models import *
 from torch.utils.data import DataLoader
@@ -12,13 +15,13 @@ import torch
 import tensorflow as tf
 from torch.utils.data.sampler import SubsetRandomSampler
 import numpy as np
-from transformers import BertModel
+from transformers import AutoModel
 
 
 if __name__ == '__main__':
     grad_accum = 1
     device = 'cuda'
-    dataset = RoyinDataset()
+    dataset = BertDataset(name='roberta-large', bos='<s>', eos='</s>')
     vocabs = dataset.vocab_size
     dataset_size = len(dataset)
     indices = list(range(dataset_size))
@@ -27,7 +30,7 @@ if __name__ == '__main__':
     np.random.shuffle(indices)
     train_indices, val_indices = indices[split:], indices[:split]
 
-    train_sampler = SubsetRandomSampler(train_indices+val_indices)
+    train_sampler = SubsetRandomSampler(train_indices)
     valid_sampler = SubsetRandomSampler(val_indices)
 
     train_loader = torch.utils.data.DataLoader(dataset, batch_size=32,
@@ -40,10 +43,10 @@ if __name__ == '__main__':
                                                     num_workers=2,
                                                     collate_fn=dataset.collate_fn,
                                                     )
-    bert = BertModel.from_pretrained('monsoon-nlp/bert-base-thai')
+    bert = AutoModel.from_pretrained('roberta-large')
     bert.requires_grad_(False)
     bert.to(device)
-    model = BertAutoEncoderOld(dataset.vocab_size)
+    model = BertAutoEncoderOld(dataset.vocab_size, 1024)
 
     # state = torch.load('/media/palm/BiggerData/dictionaries/cp13/007_2.8692e-04.pth')
     # model.load_state_dict(state)
@@ -62,14 +65,14 @@ if __name__ == '__main__':
         for idx, (word, pos_tokens,) in enumerate(train_loader):
             src, trg = pos_tokens.to(device), word.to(device)
             # todo: add src = src.data['input_ids']
-            memory = bert(src).last_hidden_state.transpose(0, 1)
+            memory = bert(**src).last_hidden_state.transpose(0, 1)
             # memory_mask = torch.zeros_like(memory)
             # memory_mask[src.data['attention_mask'].transpose(0, 1) == 1] = 1
             # embeded_word = bert.embeddings(trg.data['input_ids'][:, :-1], token_type_ids=trg.data['token_type_ids'][:, :-1]).transpose(0, 1)
             # tgt_mask = torch.zeros_like(embeded_word)
             # tgt_mask[trg.data['attention_mask'][:, :-1].transpose(0, 1)==1] = 1
             output = model(memory, trg)
-            target = torch.nn.functional.one_hot(trg[:, 1:], num_classes=vocabs).float()
+            target = torch.nn.functional.one_hot(trg.data['input_ids'][:, 1:], num_classes=vocabs).float()
             # weight = (torch.FloatTensor(*target.size()).uniform_() < 20/vocabs).float() + 1/vocabs
             # weight = torch.zeros_like(target) + 1/vocabs
             # weight[target == 1] = 1
@@ -97,10 +100,10 @@ if __name__ == '__main__':
         with torch.no_grad():
             for idx, (word, pos_tokens,) in enumerate(validation_loader):
                 src, trg = pos_tokens.to(device), word.to(device)
-                memory = bert(src).last_hidden_state.transpose(0, 1)
+                memory = bert(**src).last_hidden_state.transpose(0, 1)
                 # embeded_word = bert.embeddings(trg.data['input_ids'][:, :-1], token_type_ids=trg.data['token_type_ids'][:, :-1]).transpose(0, 1)
                 output = model(memory, trg)
-                target = torch.nn.functional.one_hot(trg[:, 1:], num_classes=vocabs).float()
+                target = torch.nn.functional.one_hot(trg.data['input_ids'][:, 1:], num_classes=vocabs).float()
                 # weight = torch.ones_like(target)
                 # weight[trg.data['attention_mask'][:, 1:] == 0] = 0
                 # weight[trg.data['input_ids'][:, 1:] == 102] = 0
@@ -110,11 +113,11 @@ if __name__ == '__main__':
                 loss = criterion(output.transpose(0, 1).transpose(1, 2), target.transpose(1, 2))
                 progbar.update(idx + 1, [('val_loss', loss.detach().item()),
                                          ('current_loss', loss.detach().item())])
-        if epoch % 2 == 1:
+        # if epoch % 2 == 1:
             the_loss = progbar._values['val_loss'][0] / progbar._values['val_loss'][1]
             if abs(the_loss) > 1e-3:
                 the_loss = f'{the_loss:.4f}'
             else:
                 the_loss = f'{the_loss:.4e}'
-            torch.save(model.state_dict(), f"/media/palm/BiggerData/dictionaries/cp14/{epoch:03d}_{the_loss}.pth")
+            torch.save(model.state_dict(), f"/media/palm/BiggerData/dictionaries/cp10/{epoch:03d}_{the_loss}.pth")
         # torch.save(model.state_dict(), f"/media/palm/BiggerData/dictionaries/cp3/last.pth")

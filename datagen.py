@@ -13,7 +13,84 @@ from bert.bpe_helper import BPE
 import sentencepiece as spm
 
 
-__all__ = ['BertDataset', 'ThaiBertDataset', 'ThaiTokenizer', 'RoyinDataset']
+__all__ = ['BertDataset', 'ThaiBertDataset', 'ThaiTokenizer', 'RoyinDataset', 'GPTDataset']
+
+
+def convert_to_unicode(text):
+    """Converts `text` to Unicode (if it's not already), assuming utf-8 input."""
+    if isinstance(text, str):
+        return text
+    elif isinstance(text, bytes):
+        return text.decode("utf-8", "ignore")
+    else:
+        raise ValueError("Unsupported string type: %s" % (type(text)))
+
+
+def load_vocab(vocab_file):
+    vocab = collections.OrderedDict()
+    index = 0
+    with open(vocab_file, "r") as reader:
+        while True:
+            token = reader.readline()
+            if token.split(): token = token.split()[0] # to support SentencePiece vocab file
+            token = convert_to_unicode(token)
+            if not token:
+                break
+            token = token.strip()
+            vocab[token] = index
+            index += 1
+    return vocab
+
+
+def convert_by_vocab(vocab, items):
+    output = []
+    for item in items:
+        output.append(vocab[item])
+    return output
+
+
+class ThaiTokenizer(object):
+    """Tokenizes Thai texts."""
+
+    def __init__(self, vocab_file, spm_file):
+        self.vocab = load_vocab(vocab_file)
+        self.inv_vocab = {v: k for k, v in self.vocab.items()}
+
+        self.bpe = BPE(vocab_file)
+        self.s = spm.SentencePieceProcessor()
+        self.s.Load(spm_file)
+        self.vocab_size = len(self.vocab)
+
+    def tokenize(self, text):
+        bpe_tokens = self.bpe.encode(text).split(' ')
+        spm_tokens = self.s.EncodeAsPieces(text)
+
+        tokens = bpe_tokens if len(bpe_tokens) < len(spm_tokens) else spm_tokens
+
+        split_tokens = []
+
+        for token in tokens:
+            new_token = token
+
+            if token.startswith('_') and not token in self.vocab:
+                split_tokens.append('_')
+                new_token = token[1:]
+
+            if not new_token in self.vocab:
+                split_tokens.append('<unk>')
+            else:
+                split_tokens.append(new_token)
+
+        return split_tokens
+
+    def __call__(self, text):
+        return [1] + self.convert_tokens_to_ids(self.tokenize(text)) + [2]
+
+    def convert_tokens_to_ids(self, tokens):
+        return convert_by_vocab(self.vocab, tokens)
+
+    def decode(self, ids):
+        return convert_by_vocab(self.inv_vocab, ids)
 
 
 def generate_batch(batch):
@@ -108,9 +185,9 @@ class SynonymsDataset(Dataset):
 
 
 class BertDataset(Dataset):
-    def __init__(self, reverse=False):
+    def __init__(self, reverse=False, name='bert-base-uncased', bos='[CLS]', eos='[SEP]'):
         # words = list(set(i for i in wn.words()))
-        self.tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased')
+        self.tokenizer = AutoTokenizer.from_pretrained(name)
         words = [w for w in list(set(i for i in wn.words())) if len(self.tokenizer([w]).data['input_ids'][0]) == 3]
         self.words = []
         for word in words:
@@ -121,8 +198,8 @@ class BertDataset(Dataset):
                 if reverse:
                     break
         self.vocab_size = self.tokenizer.vocab_size
-        self.cls = 101
-        self.sep = 102
+        self.cls = self.tokenizer.vocab[bos]
+        self.sep = self.tokenizer.vocab[eos]
 
     def __len__(self):
         return len(self.words)
@@ -146,82 +223,46 @@ class BertDataset(Dataset):
         return word, text
 
 
-def convert_to_unicode(text):
-    """Converts `text` to Unicode (if it's not already), assuming utf-8 input."""
-    if isinstance(text, str):
-        return text
-    elif isinstance(text, bytes):
-        return text.decode("utf-8", "ignore")
-    else:
-        raise ValueError("Unsupported string type: %s" % (type(text)))
+class GPTDataset(Dataset):
+    def __init__(self, reverse=False):
+        # words = list(set(i for i in wn.words()))
+        self.tokenizer = AutoTokenizer.from_pretrained('gpt2')
+        words = [w for w in list(set(i for i in wn.words())) if len(self.tokenizer([w]).data['input_ids'][0]) == 1]
+        self.words = []
+        for word in words:
+            meanings = wn.synsets(word)
+            # word = word.replace('_', ' ')
+            for meaning in meanings:
+                self.words.append((word, meaning.definition()))
+                if reverse:
+                    break
+        self.tokenizer.add_special_tokens({'pad_token': '[PAD]'})
+        self.tokenizer.add_special_tokens({'eos_token': '[SEP]'})
+        self.tokenizer.add_special_tokens({'bos_token': '[CLS]'})
+        self.vocab_size = self.tokenizer.vocab_size+2
+        self.cls = self.tokenizer.vocab['[CLS]']
+        self.sep = self.tokenizer.vocab['[SEP]']
 
+    def __len__(self):
+        return len(self.words)
 
-def load_vocab(vocab_file):
-    vocab = collections.OrderedDict()
-    index = 0
-    with open(vocab_file, "r") as reader:
-        while True:
-            token = reader.readline()
-            if token.split(): token = token.split()[0] # to support SentencePiece vocab file
-            token = convert_to_unicode(token)
-            if not token:
-                break
-            token = token.strip()
-            vocab[token] = index
-            index += 1
-    return vocab
+    def __getitem__(self, index):
+        word, text = self.words[index]
+        return word, text
 
+    def decode(self, text):
+        return self.tokenizer.decode(text)
 
-def convert_by_vocab(vocab, items):
-    output = []
-    for item in items:
-        output.append(vocab[item])
-    return output
-
-
-class ThaiTokenizer(object):
-    """Tokenizes Thai texts."""
-
-    def __init__(self, vocab_file, spm_file):
-        self.vocab = load_vocab(vocab_file)
-        self.inv_vocab = {v: k for k, v in self.vocab.items()}
-
-        self.bpe = BPE(vocab_file)
-        self.s = spm.SentencePieceProcessor()
-        self.s.Load(spm_file)
-        self.vocab_size = len(self.vocab)
-
-    def tokenize(self, text):
-        bpe_tokens = self.bpe.encode(text).split(' ')
-        spm_tokens = self.s.EncodeAsPieces(text)
-
-        tokens = bpe_tokens if len(bpe_tokens) < len(spm_tokens) else spm_tokens
-
-        split_tokens = []
-
-        for token in tokens:
-            new_token = token
-
-            if token.startswith('_') and not token in self.vocab:
-                split_tokens.append('_')
-                new_token = token[1:]
-
-            if not new_token in self.vocab:
-                split_tokens.append('<unk>')
-            else:
-                split_tokens.append(new_token)
-
-        return split_tokens
-
-    def __call__(self, text):
-        return [1] + self.convert_tokens_to_ids(self.tokenize(text)) + [2]
-
-    def convert_tokens_to_ids(self, tokens):
-        return convert_by_vocab(self.vocab, tokens)
-
-    def decode(self, ids):
-        return convert_by_vocab(self.inv_vocab, ids)
-
+    def collate_fn(self, batch):
+        text = [entry[1] for entry in batch]
+        word = [entry[0] for entry in batch]
+        text = self.tokenizer(text, return_tensors='pt', padding=True)
+        word = self.tokenizer(['[CLS]', *word, '[SEP]'], return_tensors='pt', padding=True)
+        # text.data['attention_mask'][text.data['input_ids'] == 102] = 0
+        # text.data['input_ids'][text.data['input_ids'] == 102] = 0
+        # word.data['attention_mask'][word.data['input_ids'] == 102] = 0
+        # word.data['input_ids'][word.data['input_ids'] == 102] = 0
+        return word, text
 
 class RoyinDataset(Dataset):
     def __init__(self):

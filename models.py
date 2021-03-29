@@ -3,7 +3,7 @@ from torch import nn
 from torch.nn import functional as F
 import math
 
-__all__ = ['BertAutoEncoderWithEmb', 'BertAutoEncoder', 'BertAutoEncoderOld', 'FocalLoss']
+__all__ = ['BertAutoEncoderWithEmb', 'BertAutoEncoder', 'BertAutoEncoderOld', 'FocalLoss', 'GPTAutoEncoder']
 
 class BertEmbeddings(nn.Module):
     """Construct the embeddings from word, position and token_type embeddings."""
@@ -185,6 +185,23 @@ class BertAutoEncoderWithEmb(nn.Module):
 
 
 class BertAutoEncoderOld(nn.Module):
+    def __init__(self, vocab_size, hidden_size=768):
+        super().__init__()
+        decoder_layer = nn.TransformerDecoderLayer(hidden_size, 2, 1024, dropout=0.1)
+        self.transformer_decoder = nn.TransformerDecoder(decoder_layer, 2)
+        self.decoder = nn.Embedding(vocab_size, hidden_size)
+        self.pos_decoder = PositionalEncoding(hidden_size, 0.5)
+        self.fc = nn.Linear(hidden_size, vocab_size)
+
+    def forward(self, memory, word):
+        tgt = self.decoder(word.data['input_ids'][:, :-1].transpose(0, 1))
+        tgt = self.pos_decoder(tgt)
+        output = self.transformer_decoder(tgt, memory)
+        output = self.fc(output)
+        return output
+
+
+class GPTAutoEncoder(nn.Module):
     def __init__(self, vocab_size):
         super().__init__()
         decoder_layer = nn.TransformerDecoderLayer(768, 2, 1024, dropout=0.1)

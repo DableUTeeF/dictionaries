@@ -11,9 +11,12 @@ from transformers import AutoTokenizer
 import collections
 from bert.bpe_helper import BPE
 import sentencepiece as spm
+import sys
+sys.path.extend(['/home/palm/PycharmProjects/sentence-transformers'])
+from sentence_transformers import InputExample
 
 
-__all__ = ['BertDataset', 'ThaiBertDataset', 'ThaiTokenizer', 'RoyinDataset', 'GPTDataset']
+__all__ = ['BertDataset', 'ThaiBertDataset', 'ThaiTokenizer', 'RoyinDataset', 'GPTDataset', 'SentenceDataset']
 
 
 def convert_to_unicode(text):
@@ -182,6 +185,50 @@ class SynonymsDataset(Dataset):
         word = torch.tensor([self.vocab[word]])
         other = torch.tensor([self.vocab[other]])
         return word, other, label
+
+
+class SentenceDataset(Dataset):
+    def __init__(self, words=None, indices=None):
+        if words is None:
+            words = list(set(i for i in wn.words()))
+            self.words = []
+            for word in words:
+                meanings = wn.synsets(word)
+                # word = word.replace('_', ' ')
+                for meaning in meanings:
+                    self.words.append((word, meaning.definition()))
+            self.indices = list(range(len(self.words)))
+        else:
+            self.words = words
+            self.indices = indices
+
+    def __len__(self):
+        return len(self.indices)
+
+    def train(self, train, seed=88):
+        dataset_size = len(self.words)
+        indices = list(range(dataset_size))
+        split = int(np.floor(0.2 * dataset_size))
+        np.random.seed(seed)
+        np.random.shuffle(indices)
+        train_indices, val_indices = indices[split:], indices[:split]
+        if train:
+            return SentenceDataset(self.words, train_indices)
+        else:
+            return SentenceDataset(self.words, val_indices)
+
+    def __getitem__(self, index):
+        word, meaning = self.words[self.indices[index]]
+        if np.random.rand() > 0.6:
+            out = InputExample(texts=[meaning, word], label=0.8)
+        else:
+            while True:
+                idx = torch.randint(0, len(self), (1,))
+                other, _ = self.words[self.indices[idx]]
+                if other != word:
+                    break
+            out = InputExample(texts=[meaning, other], label=0.2)
+        return out
 
 
 class BertDataset(Dataset):

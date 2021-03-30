@@ -16,7 +16,7 @@ sys.path.extend(['/home/palm/PycharmProjects/sentence-transformers'])
 from sentence_transformers import InputExample
 
 
-__all__ = ['BertDataset', 'ThaiBertDataset', 'ThaiTokenizer', 'RoyinDataset', 'GPTDataset', 'SentenceDataset']
+__all__ = ['BertDataset', 'ThaiBertDataset', 'ThaiTokenizer', 'RoyinDataset', 'GPTDataset', 'SentenceDataset', 'ThaiSentenceDataset']
 
 
 def convert_to_unicode(text):
@@ -186,8 +186,60 @@ class SynonymsDataset(Dataset):
         other = torch.tensor([self.vocab[other]])
         return word, other, label
 
+def sentence_len(self):
+    return len(self.indices)
+
+def sentence_train(self, train, seed=88):
+    dataset_size = len(self.words)
+    indices = list(range(dataset_size))
+    split = int(np.floor(0.2 * dataset_size))
+    np.random.seed(seed)
+    np.random.shuffle(indices)
+    train_indices, val_indices = indices[split:], indices[:split]
+    if train:
+        return SentenceDataset(self.words, train_indices)
+    else:
+        return SentenceDataset(self.words, val_indices)
+
+def sentence_getitem(self, index):
+    word, meaning = self.words[self.indices[index]]
+    if np.random.rand() > 0.6:
+        out = InputExample(texts=[meaning, word], label=0.8)
+    else:
+        while True:
+            idx = torch.randint(0, len(self), (1,))
+            other, _ = self.words[self.indices[idx]]
+            if other != word:
+                break
+        out = InputExample(texts=[meaning, other], label=0.2)
+    return out
+
+
+class ThaiSentenceDataset(Dataset):
+    __len__ = sentence_len
+    train = sentence_train
+    __getitem__ = sentence_getitem
+    def __init__(self, words=None, indices=None):
+        if words is None:
+            self.patterns = [r'\([^)]*\)', r'\[[^)]*\]', r'&#[a-z\d]*;', r'<\/[a-z\d]{1,6}>', r'<[a-z\d]{1,6}>']
+            words = pd.read_csv('data/royin_dict_2542.tsv', sep='\t')
+            self.words = []
+            for _, row in words.iterrows():
+                word = row.Word1.split(',')[0]
+                text = row.Definition
+                for pattern in self.patterns:
+                    text = re.sub(pattern, '', text)
+                self.words.append((word, text))
+            self.indices = list(range(len(self.words)))
+        else:
+            self.words = words
+            self.indices = indices
+
 
 class SentenceDataset(Dataset):
+    __len__ = sentence_len
+    train = sentence_train
+    __getitem__ = sentence_getitem
     def __init__(self, words=None, indices=None):
         if words is None:
             words = list(set(i for i in wn.words()))
@@ -201,34 +253,6 @@ class SentenceDataset(Dataset):
         else:
             self.words = words
             self.indices = indices
-
-    def __len__(self):
-        return len(self.indices)
-
-    def train(self, train, seed=88):
-        dataset_size = len(self.words)
-        indices = list(range(dataset_size))
-        split = int(np.floor(0.2 * dataset_size))
-        np.random.seed(seed)
-        np.random.shuffle(indices)
-        train_indices, val_indices = indices[split:], indices[:split]
-        if train:
-            return SentenceDataset(self.words, train_indices)
-        else:
-            return SentenceDataset(self.words, val_indices)
-
-    def __getitem__(self, index):
-        word, meaning = self.words[self.indices[index]]
-        if np.random.rand() > 0.6:
-            out = InputExample(texts=[meaning, word], label=0.8)
-        else:
-            while True:
-                idx = torch.randint(0, len(self), (1,))
-                other, _ = self.words[self.indices[idx]]
-                if other != word:
-                    break
-            out = InputExample(texts=[meaning, other], label=0.2)
-        return out
 
 
 class BertDataset(Dataset):

@@ -1,13 +1,11 @@
 from sentence_transformers import SentenceTransformer, InputExample, losses, evaluation
-from datagen import SentenceDataset
+from datagen import *
 import torch
 if __name__ == '__main__':
-    model = SentenceTransformer('/media/palm/BiggerData/dictionaries/cp10')
-    dataset = SentenceDataset()
+    model = SentenceTransformer('/media/palm/BiggerData/dictionaries/cp11')
+    dataset = ThaiSentenceDataset()
     val_set = dataset.train(False)
 
-    sentences = ['The cos_score_transformation function is applied on top of cosine_similarity',
-                 'School']
     with torch.no_grad():
         for data in val_set:
             meaning, word = data.texts

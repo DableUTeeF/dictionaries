@@ -12,11 +12,11 @@ import collections
 from bert.bpe_helper import BPE
 import sentencepiece as spm
 import sys
+
 sys.path.extend(['/home/palm/PycharmProjects/sentence-transformers'])
 from sentence_transformers import InputExample
 
-
-__all__ = ['BertDataset', 'ThaiBertDataset', 'ThaiTokenizer', 'RoyinDataset', 'GPTDataset', 'SentenceDataset', 'ThaiSentenceDataset']
+__all__ = ['BertDataset', 'ThaiBertDataset', 'ThaiTokenizer', 'RoyinDataset', 'GPTDataset', 'SentenceDataset']
 
 
 def convert_to_unicode(text):
@@ -35,7 +35,8 @@ def load_vocab(vocab_file):
     with open(vocab_file, "r") as reader:
         while True:
             token = reader.readline()
-            if token.split(): token = token.split()[0] # to support SentencePiece vocab file
+            if token.split():
+                token = token.split()[0]  # to support SentencePiece vocab file
             token = convert_to_unicode(token)
             if not token:
                 break
@@ -75,11 +76,11 @@ class ThaiTokenizer(object):
         for token in tokens:
             new_token = token
 
-            if token.startswith('_') and not token in self.vocab:
+            if token.startswith('_') and token not in self.vocab:
                 split_tokens.append('_')
                 new_token = token[1:]
 
-            if not new_token in self.vocab:
+            if new_token not in self.vocab:
                 split_tokens.append('<unk>')
             else:
                 split_tokens.append(new_token)
@@ -166,7 +167,7 @@ class SynonymsDataset(Dataset):
         return len(self.vocab.itos) - 2
 
     def __getitem__(self, index):
-        word = self.vocab.itos[index+2]
+        word = self.vocab.itos[index + 2]
         ss = wn.synsets(word)
         lemmas = np.random.choice(ss).lemma_names()
         if len(lemmas) > 1 and np.random.rand() > 0.5:
@@ -178,81 +179,125 @@ class SynonymsDataset(Dataset):
                 possible_lemmas.extend(synset.lemma_names())
             while True:
                 idx = torch.randint(0, len(self), (1,))
-                if self.vocab.itos[idx+2] not in possible_lemmas:
+                if self.vocab.itos[idx + 2] not in possible_lemmas:
                     break
-            other = self.vocab.itos[idx+2]
+            other = self.vocab.itos[idx + 2]
             label = torch.zeros(1)
         word = torch.tensor([self.vocab[word]])
         other = torch.tensor([self.vocab[other]])
         return word, other, label
 
-def sentence_len(self):
-    return len(self.indices)
-
-def sentence_train(self, train, seed=88):
-    dataset_size = len(self.words)
-    indices = list(range(dataset_size))
-    split = int(np.floor(0.2 * dataset_size))
-    np.random.seed(seed)
-    np.random.shuffle(indices)
-    train_indices, val_indices = indices[split:], indices[:split]
-    if train:
-        return SentenceDataset(self.words, train_indices)
-    else:
-        return SentenceDataset(self.words, val_indices)
-
-def sentence_getitem(self, index):
-    word, meaning = self.words[self.indices[index]]
-    if np.random.rand() > 0.6:
-        out = InputExample(texts=[meaning, word], label=0.8)
-    else:
-        while True:
-            idx = torch.randint(0, len(self), (1,))
-            other, _ = self.words[self.indices[idx]]
-            if other != word:
-                break
-        out = InputExample(texts=[meaning, other], label=0.2)
-    return out
-
-
-class ThaiSentenceDataset(Dataset):
-    __len__ = sentence_len
-    train = sentence_train
-    __getitem__ = sentence_getitem
-    def __init__(self, words=None, indices=None):
-        if words is None:
-            self.patterns = [r'\([^)]*\)', r'\[[^)]*\]', r'&#[a-z\d]*;', r'<\/[a-z\d]{1,6}>', r'<[a-z\d]{1,6}>']
-            words = pd.read_csv('data/royin_dict_2542.tsv', sep='\t')
-            self.words = []
-            for _, row in words.iterrows():
-                word = row.Word1.split(',')[0]
-                text = row.Definition
-                for pattern in self.patterns:
-                    text = re.sub(pattern, '', text)
-                self.words.append((word, text))
-            self.indices = list(range(len(self.words)))
-        else:
-            self.words = words
-            self.indices = indices
-
 
 class SentenceDataset(Dataset):
-    __len__ = sentence_len
-    train = sentence_train
-    __getitem__ = sentence_getitem
-    def __init__(self, words=None, indices=None):
+    def __init__(self, language=None, words=None, indices=None):
+        self.patterns = [r'\([^)]*\)', r'\[[^)]*\]', r'&#[a-z\d]*;', r'<\/[a-z\d]{1,6}>', r'<[a-z\d]{1,6}>']
+        self.language = language
         if words is None:
-            words = list(set(i for i in wn.words()))
-            self.words = []
-            for word in words:
-                meanings = wn.synsets(word)
-                # word = word.replace('_', ' ')
-                for meaning in meanings:
-                    self.words.append((word, meaning.definition()))
-            self.indices = list(range(len(self.words)))
+            if language == 'thai':
+                self.words, self.indices = self.thai()
+            elif language == 'eng':
+                self.words, self.indices = self.eng()
+            elif language == 'all':
+                self.indices = []
+                self.eng_wn_words, self.thai_words, self.thai_wn_words, self.match_words, self.indices = self.all()
+            else:
+                raise ValueError('Both `words` and `language` are `None`')
         else:
             self.words = words
             self.indices = indices
+
+    def train(self, train, seed=88):
+        dataset_size = len(self.words)
+        indices = list(range(dataset_size))
+        split = int(np.floor(0.2 * dataset_size))
+        np.random.seed(seed)
+        np.random.shuffle(indices)
+        train_indices, val_indices = indices[split:], indices[:split]
+        if train:
+            return SentenceDataset(self.words, train_indices)
+        else:
+            return SentenceDataset(self.words, val_indices)
+
+    def all(self):
+        # prepare all data
+        thai_words, thai_indices = self.thai()
+        eng_words, eng_indices = self.eng()
+        thai_wn_words = []
+        thai_wn_lemmas = [x for x in wn.all_lemma_names(lang='tha')]
+        for word in thai_wn_lemmas:
+            meanings = wn.synsets(word, lang='tha')
+            word = word.replace('_', ' ')
+            for meaning in meanings:
+                thai_wn_words.append((word, meaning.definition(), meaning.lemma_names()[0]))
+
+        # find matching words from both language
+        match_words = set()
+        for word, _ in thai_words:
+            if word in thai_wn_lemmas:
+                match_words.add(word)
+        match_words = list(match_words)
+        indices = list(range(len(eng_words)+len(thai_words)+len(thai_wn_words)+len(match_words)))
+        return eng_words, thai_words, thai_wn_words, match_words, indices
+
+    def eng(self):
+        words = list(set(i for i in wn.words()))
+        out_words = []
+        for word in words:
+            meanings = wn.synsets(word)
+            word = word.replace('_', ' ')
+            for meaning in meanings:
+                out_words.append((word, meaning.definition()))
+        indices = list(range(len(out_words)))
+        return out_words, indices
+
+    def thai(self):
+        words = pd.read_csv('data/royin_dict_2542.tsv', sep='\t')
+        out_words = []
+        for _, row in words.iterrows():
+            word = row.Word1.split(',')[0]
+            text = row.Definition
+            for pattern in self.patterns:
+                text = re.sub(pattern, '', text)
+            out_words.append((word, text))
+        indices = list(range(len(out_words)))
+        return out_words, indices
+
+    def __len__(self):
+        return len(self.indices)
+
+    def __getitem__(self, index):
+        """
+            0.5: match
+               0.4: word - sentence
+                  0.: eng - eng: 100000+
+                  0.: thai - thai: 37706
+                  0.: thai - eng: 93045
+                  0.: eng - thai: 6310
+               0.05: sentence - sentence: 6310 - match word from thai to eng then pick random sentences
+               0.05: word - word: 80508
+            0.5: not match
+               0.: eng-eng
+               0.: thai-thai
+               0.: both
+        """
+        if self.language in ['thai', 'eng']:
+            word, meaning = self.words[self.indices[index]]
+            if np.random.rand() > 0.6:
+                out = InputExample(texts=[meaning, word], label=0.8)
+            else:
+                while True:
+                    idx = torch.randint(0, len(self), (1,))
+                    other, _ = self.words[self.indices[idx]]
+                    if other != word:
+                        break
+                out = InputExample(texts=[meaning, other], label=0.2)
+            return out
+        else:
+            k = np.random.rand()
+            if k > 0.5:  # match
+                pass
+            else:  # not match
+                pass
 
 
 class BertDataset(Dataset):
@@ -310,7 +355,7 @@ class GPTDataset(Dataset):
         self.tokenizer.add_special_tokens({'pad_token': '[PAD]'})
         self.tokenizer.add_special_tokens({'eos_token': '[SEP]'})
         self.tokenizer.add_special_tokens({'bos_token': '[CLS]'})
-        self.vocab_size = self.tokenizer.vocab_size+2
+        self.vocab_size = self.tokenizer.vocab_size + 2
         self.cls = self.tokenizer.vocab['[CLS]']
         self.sep = self.tokenizer.vocab['[SEP]']
 
@@ -335,11 +380,13 @@ class GPTDataset(Dataset):
         # word.data['input_ids'][word.data['input_ids'] == 102] = 0
         return word, text
 
+
 class RoyinDataset(Dataset):
     def __init__(self):
         self.patterns = [r'\([^)]*\)', r'\[[^)]*\]', r'&#[a-z\d]*;', r'<\/[a-z\d]{1,6}>', r'<[a-z\d]{1,6}>']
         self.df = pd.read_csv('data/royin_dict_2542.tsv', sep='\t')
-        self.tokenizer = ThaiTokenizer(vocab_file='data/th_wiki_bpe/th.wiki.bpe.op25000.vocab', spm_file='data/th_wiki_bpe/th.wiki.bpe.op25000.model')
+        self.tokenizer = ThaiTokenizer(vocab_file='data/th_wiki_bpe/th.wiki.bpe.op25000.vocab',
+                                       spm_file='data/th_wiki_bpe/th.wiki.bpe.op25000.model')
         self.target = {'[PAD]', '[CLS]', '[SEP]'}
         for word in self.df.Word1:
             w = word.split(',')[0]
@@ -376,10 +423,11 @@ class RoyinDataset(Dataset):
 class ThaiBertDataset(Dataset):
     def __init__(self):
         self.patterns = [r'\([^)]*\)', r'\[[^)]*\]', r'&#[a-z\d]*;', r'<\/[a-z\d]{1,6}>', r'<[a-z\d]{1,6}>']
-        self.tokenizer = ThaiTokenizer(vocab_file='data/th_wiki_bpe/th.wiki.bpe.op25000.vocab', spm_file='data/th_wiki_bpe/th.wiki.bpe.op25000.model')
+        self.tokenizer = ThaiTokenizer(vocab_file='data/th_wiki_bpe/th.wiki.bpe.op25000.vocab',
+                                       spm_file='data/th_wiki_bpe/th.wiki.bpe.op25000.model')
         self.df = pd.read_csv('data/dictdb_th_en.csv', sep=';')
         self.target = pd.unique(self.df.sentry)
-        self.targetid = {k: v+2 for v, k in enumerate(self.target)}
+        self.targetid = {k: v + 2 for v, k in enumerate(self.target)}
         self.targetid['[PAD]'] = 0
         self.targetid['[CLS]'] = 1
         self.targetid['[SEP]'] = 2
@@ -454,7 +502,8 @@ class WordTriplet(WordDataset):
         word = self.words[index]
         data = wn.synsets(word)
         pos_tokens = np.random.choice(data).definition()
-        pos_token_ids = list(filter(lambda x: x is not Vocab.UNK, [self.vocab[token] for token in pos_tokens.split(' ')]))
+        pos_token_ids = list(
+            filter(lambda x: x is not Vocab.UNK, [self.vocab[token] for token in pos_tokens.split(' ')]))
         while True:
             idx = torch.randint(0, len(self), (1,))
             if idx != index:
@@ -466,11 +515,11 @@ class WordTriplet(WordDataset):
         neg_tokens = torch.tensor(neg_token_ids)
         pos_tokens = torch.tensor(pos_token_ids)
         word = torch.tensor([self.vocab[word]])
-        neg_out = torch.zeros((self.max_len, ), dtype=torch.long)
+        neg_out = torch.zeros((self.max_len,), dtype=torch.long)
         neg_out[:neg_tokens.size(0)] = neg_tokens
-        pos_out = torch.zeros((self.max_len, ), dtype=torch.long)
+        pos_out = torch.zeros((self.max_len,), dtype=torch.long)
         pos_out[:pos_tokens.size(0)] = pos_tokens
-        word_out = torch.zeros((self.max_len, ), dtype=torch.long)
+        word_out = torch.zeros((self.max_len,), dtype=torch.long)
         word_out[0] = self.vocab[word]
         return word, pos_tokens, neg_tokens
 

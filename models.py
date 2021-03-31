@@ -3,7 +3,9 @@ from torch import nn
 from torch.nn import functional as F
 import math
 
-__all__ = ['BertAutoEncoderWithEmb', 'BertAutoEncoder', 'BertAutoEncoderOld', 'FocalLoss', 'GPTAutoEncoder']
+__all__ = ['BertAutoEncoderWithEmb', 'BertAutoEncoder', 'BertAutoEncoderOld', 'FocalLoss', 'GPTAutoEncoder',
+           'SentenceMatch', 'CosineLoss']
+
 
 class BertEmbeddings(nn.Module):
     """Construct the embeddings from word, position and token_type embeddings."""
@@ -70,12 +72,23 @@ class FocalLoss(nn.Module):
         else:
             BCE_loss = F.binary_cross_entropy(inputs, targets, reduce=False)
         pt = torch.exp(-BCE_loss)
-        F_loss = self.alpha * (1-pt)**self.gamma * BCE_loss
+        F_loss = self.alpha * (1 - pt) ** self.gamma * BCE_loss
 
         if self.reduce:
             return torch.mean(F_loss)
         else:
             return F_loss
+
+
+class CosineLoss(nn.Module):
+    def __init__(self, loss_fct=nn.MSELoss(), cos_score_transformation=nn.Identity()):
+        super().__init__()
+        self.loss_fct = loss_fct
+        self.cos_score_transformation = cos_score_transformation
+
+    def forward(self, input1, input2, labels):
+        output = self.cos_score_transformation(torch.cosine_similarity(input1, input2))
+        return self.loss_fct(output, labels.view(-1))
 
 
 class ContrastiveLoss(nn.Module):
@@ -113,6 +126,19 @@ class TripletLoss(nn.Module):
         distance_negative = (anchor - negative).pow(2).sum(1)  # .pow(.5)
         losses = F.relu(distance_positive - distance_negative + self.margin)
         return losses.mean() if size_average else losses.sum()
+
+
+class SentenceMatch(nn.Module):
+    def __init__(self, input_size, hidden_size, output_size):
+        super().__init__()
+        self.input = nn.Linear(input_size, hidden_size)
+        self.output = nn.Linear(hidden_size, output_size)
+
+    def forward(self, x):
+        x = self.input(x)
+        x = F.relu(x)
+        x = self.output(x)
+        return x
 
 
 class TextSentiment(nn.Module):
@@ -164,7 +190,8 @@ class BertAutoEncoder(nn.Module):
         self.fc = nn.Linear(768, vocab_size)
 
     def forward(self, memory, embedded_word, tgt_mask=None, memory_mask=None):
-        output = self.transformer_decoder(embedded_word, memory, tgt_key_padding_mask=tgt_mask, memory_key_padding_mask=memory_mask)
+        output = self.transformer_decoder(embedded_word, memory, tgt_key_padding_mask=tgt_mask,
+                                          memory_key_padding_mask=memory_mask)
         output = self.fc(output)
         return output
 
@@ -178,7 +205,8 @@ class BertAutoEncoderWithEmb(nn.Module):
         self.embedding = BertEmbeddings(vocab_size, 768, 512, 0, 2, 1e-12, 0.1)
 
     def forward(self, memory, word):
-        embedded_word = self.embedding(word.data['input_ids'][:, :-1], token_type_ids=word.data['token_type_ids'][:, :-1]).transpose(0, 1)
+        embedded_word = self.embedding(word.data['input_ids'][:, :-1],
+                                       token_type_ids=word.data['token_type_ids'][:, :-1]).transpose(0, 1)
         output = self.transformer_decoder(embedded_word, memory)
         output = self.fc(output)
         return output
@@ -370,7 +398,8 @@ class LSTM_AE(nn.Module):
                 weight_hh_data_if = torch.eye(self.hidden_units, self.hidden_units)  # H_Wif
                 weight_hh_data_ic = torch.eye(self.hidden_units, self.hidden_units)  # H_Wic
                 weight_hh_data_io = torch.eye(self.hidden_units, self.hidden_units)  # H_Wio
-                weight_hh_data = torch.stack([weight_hh_data_ii, weight_hh_data_if, weight_hh_data_ic, weight_hh_data_io], dim=0)
+                weight_hh_data = torch.stack(
+                    [weight_hh_data_ii, weight_hh_data_if, weight_hh_data_ic, weight_hh_data_io], dim=0)
                 weight_hh_data = weight_hh_data.view(self.hidden_units * 4, self.hidden_units)
                 self.hidden.state_dict()[value].data.copy_(weight_hh_data)
             elif 'bias' in value:
@@ -399,4 +428,3 @@ if __name__ == '__main__':
         for text, text_offsets, word, word_offsets, label in data:
             y = model(text, text_offsets)
     print()
-

@@ -1,3 +1,7 @@
+"""
+eng: cp10
+tha: cp11
+"""
 from sentence_transformers import SentenceTransformer, InputExample, losses, evaluation
 from datagen import *
 import torch

@@ -198,8 +198,7 @@ class SentenceDataset(Dataset):
             elif language == 'eng':
                 self.words, self.indices = self.eng()
             elif language == 'all':
-                self.indices = []
-                self.eng_wn_words, self.thai_words, self.thai_wn_words, self.match_words, self.indices = self.all()
+                self.words, self.indices = self.all()
             else:
                 raise ValueError('Both `words` and `language` are `None`')
         else:
@@ -219,25 +218,15 @@ class SentenceDataset(Dataset):
             return SentenceDataset(language=self.language, words=self.words, indices=val_indices)
 
     def all(self):
-        # prepare all data
-        thai_words, thai_indices = self.thai()
-        eng_words, eng_indices = self.eng()
         thai_wn_words = []
         thai_wn_lemmas = [x for x in wn.all_lemma_names(lang='tha')]
         for word in thai_wn_lemmas:
             meanings = wn.synsets(word, lang='tha')
             word = word.replace('_', ' ')
             for meaning in meanings:
-                thai_wn_words.append((word, meaning.definition(), meaning.lemma_names()[0]))
-
-        # find matching words from both language
-        match_words = set()
-        for word, _ in thai_words:
-            if word in thai_wn_lemmas:
-                match_words.add(word)
-        match_words = list(match_words)
-        indices = list(range(len(eng_words)+len(thai_words)+len(thai_wn_words)+len(match_words)))
-        return eng_words, thai_words, thai_wn_words, match_words, indices
+                thai_wn_words.append((word, meaning.lemma_names()[0]))
+        indices = list(range(len(thai_wn_words)))
+        return thai_wn_words, indices
 
     def eng(self):
         words = list(set(i for i in wn.words()))
@@ -265,7 +254,18 @@ class SentenceDataset(Dataset):
     def __len__(self):
         return len(self.indices)
 
-    def __getitem__(self, index):
+    def collate_fn(self, batch):
+        word1s = []
+        word2s = []
+        labels = []
+        for sample in batch:
+            word1, word2 = sample.texts
+            word1s.append(word1)
+            word2s.append(word2)
+            labels.append(sample.label)
+        return word1s, word2s, torch.tensor(labels)
+
+    def __getitem__(self, index) -> InputExample:
         """
             0.5: match
                0.4: word - sentence

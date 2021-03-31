@@ -214,9 +214,9 @@ class SentenceDataset(Dataset):
         np.random.shuffle(indices)
         train_indices, val_indices = indices[split:], indices[:split]
         if train:
-            return SentenceDataset(self.words, train_indices)
+            return SentenceDataset(language=self.language, words=self.words, indices=train_indices)
         else:
-            return SentenceDataset(self.words, val_indices)
+            return SentenceDataset(language=self.language, words=self.words, indices=val_indices)
 
     def all(self):
         # prepare all data
@@ -280,24 +280,17 @@ class SentenceDataset(Dataset):
                0.: thai-thai
                0.: both
         """
-        if self.language in ['thai', 'eng']:
-            word, meaning = self.words[self.indices[index]]
-            if np.random.rand() > 0.6:
-                out = InputExample(texts=[meaning, word], label=0.8)
-            else:
-                while True:
-                    idx = torch.randint(0, len(self), (1,))
-                    other, _ = self.words[self.indices[idx]]
-                    if other != word:
-                        break
-                out = InputExample(texts=[meaning, other], label=0.2)
-            return out
+        word, meaning = self.words[self.indices[index]]
+        if np.random.rand() > 0.6:
+            out = InputExample(texts=[meaning, word], label=0.8)
         else:
-            k = np.random.rand()
-            if k > 0.5:  # match
-                pass
-            else:  # not match
-                pass
+            while True:
+                idx = torch.randint(0, len(self), (1,))
+                other, _ = self.words[self.indices[idx]]
+                if other != word:
+                    break
+            out = InputExample(texts=[meaning, other], label=0.2)
+        return out
 
 
 class BertDataset(Dataset):

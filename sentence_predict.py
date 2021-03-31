@@ -2,8 +2,8 @@ from sentence_transformers import SentenceTransformer, InputExample, losses, eva
 from datagen import *
 import torch
 if __name__ == '__main__':
-    model = SentenceTransformer('/media/palm/BiggerData/dictionaries/cp11')
-    dataset = ThaiSentenceDataset()
+    model = SentenceTransformer('cp11-work')
+    dataset = SentenceDataset('thai')
     val_set = dataset.train(False)
 
     with torch.no_grad():

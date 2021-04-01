@@ -255,15 +255,15 @@ class SentenceDataset(Dataset):
         return len(self.indices)
 
     def collate_fn(self, batch):
-        word1s = []
-        word2s = []
+        engs = []
+        thas = []
         labels = []
         for sample in batch:
-            word1, word2 = sample.texts
-            word1s.append(word1)
-            word2s.append(word2)
+            eng, tha = sample.texts
+            engs.append(eng)
+            thas.append(tha)
             labels.append(sample.label)
-        return word1s, word2s, torch.tensor(labels)
+        return engs, thas, torch.tensor(labels)
 
     def __getitem__(self, index) -> InputExample:
         """
@@ -280,16 +280,16 @@ class SentenceDataset(Dataset):
                0.: thai-thai
                0.: both
         """
-        word, meaning = self.words[self.indices[index]]
+        tha, eng = self.words[self.indices[index]]
         if np.random.rand() > 0.6:
-            out = InputExample(texts=[meaning, word], label=0.8)
+            out = InputExample(texts=[eng, tha], label=0.8)
         else:
             while True:
                 idx = torch.randint(0, len(self), (1,))
-                other, _ = self.words[self.indices[idx]]
-                if other != word:
+                other_tha, _ = self.words[self.indices[idx]]
+                if other_tha != tha:
                     break
-            out = InputExample(texts=[meaning, other], label=0.2)
+            out = InputExample(texts=[eng, other_tha], label=0.2)
         return out
 
 

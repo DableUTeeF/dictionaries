@@ -189,9 +189,10 @@ class SynonymsDataset(Dataset):
 
 
 class SentenceDataset(Dataset):
-    def __init__(self, language=None, words=None, indices=None):
+    def __init__(self, language=None, words=None, indices=None, true_only=False):
         self.patterns = [r'\([^)]*\)', r'\[[^)]*\]', r'&#[a-z\d]*;', r'<\/[a-z\d]{1,6}>', r'<[a-z\d]{1,6}>']
         self.language = language
+        self.true_only = true_only
         if words is None:
             if language == 'thai':
                 self.words, self.indices = self.thai()
@@ -213,9 +214,9 @@ class SentenceDataset(Dataset):
         np.random.shuffle(indices)
         train_indices, val_indices = indices[split:], indices[:split]
         if train:
-            return SentenceDataset(language=self.language, words=self.words, indices=train_indices)
+            return SentenceDataset(language=self.language, words=self.words, indices=train_indices, true_only=self.true_only)
         else:
-            return SentenceDataset(language=self.language, words=self.words, indices=val_indices)
+            return SentenceDataset(language=self.language, words=self.words, indices=val_indices, true_only=self.true_only)
 
     def all(self):
         thai_wn_words = []
@@ -281,7 +282,7 @@ class SentenceDataset(Dataset):
                0.: both
         """
         tha, eng = self.words[self.indices[index]]
-        if np.random.rand() > 0.6:
+        if np.random.rand() > 0.6 or self.true_only:
             out = InputExample(texts=[eng, tha], label=0.8)
         else:
             while True:

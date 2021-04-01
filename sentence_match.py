@@ -8,6 +8,13 @@ import torch
 from torch.utils.data import DataLoader
 import tensorflow as tf
 
+def check_features(features, strings, sm):
+    output = []
+    for string in strings:
+        if string not in features:
+            features[string] = sm.encode(string, convert_to_tensor=True)
+        output.append(features[string])
+    return torch.tensor(output)
 
 if __name__ == '__main__':
     device = 'cuda'
@@ -30,14 +37,15 @@ if __name__ == '__main__':
     train_loader = DataLoader(dataset.train(True), batch_size=16, shuffle=True, collate_fn=dataset.collate_fn)
     validation_loader = DataLoader(dataset.train(False), batch_size=16, shuffle=True, collate_fn=dataset.collate_fn)
 
+    features = {}
     for epoch in range(100):
         print('Epoch:', epoch + 1)
         progbar = tf.keras.utils.Progbar(len(train_loader),
                                          stateful_metrics=['current_loss'])
         for idx, (eng_words, tha_words, labels) in enumerate(train_loader):
-            eng_features = eng_sm.encode(eng_words, convert_to_tensor=True)
+            eng_features = check_features(features, eng_words, eng_sm)
             eng_features = model(eng_features.to(device))
-            tha_features = tha_sm.encode(tha_words, convert_to_tensor=True)
+            tha_features = check_features(features, tha_words, tha_sm)
             tha_features = model(tha_features.to(device))
             loss = criterion(eng_features, tha_features, labels.cuda())
             loss.backward()
@@ -51,9 +59,9 @@ if __name__ == '__main__':
                                          stateful_metrics=['current_loss'])
         with torch.no_grad():
             for idx, (eng_words, tha_words, labels) in enumerate(validation_loader):
-                eng_features = eng_sm.encode(eng_words, convert_to_tensor=True)
+                eng_features = check_features(features, eng_words, eng_sm)
                 eng_features = model(eng_features.to(device))
-                tha_features = tha_sm.encode(tha_words, convert_to_tensor=True)
+                tha_features = check_features(features, tha_words, tha_sm)
                 tha_features = model(tha_features.to(device))
                 loss = criterion(eng_features, tha_features, labels.cuda())
                 progbar.update(idx + 1, [('val_loss', loss.detach().item()),

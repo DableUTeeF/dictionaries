@@ -20,8 +20,6 @@ if __name__ == '__main__':
     eng_sm.requires_grad_(False)
     eng_sm.train(False)
 
-    dataset.set_sm(tha_sm, eng_sm)
-
     model = SentenceMatch(768, 2048, 768)
     model.to(device)
 
@@ -36,8 +34,10 @@ if __name__ == '__main__':
         print('Epoch:', epoch + 1)
         progbar = tf.keras.utils.Progbar(len(train_loader),
                                          stateful_metrics=['current_loss'])
-        for idx, (eng_features, tha_features, labels) in enumerate(train_loader):
+        for idx, (eng_words, tha_words, labels) in enumerate(train_loader):
+            eng_features = eng_sm.encode(eng_words, convert_to_tensor=True)
             eng_features = model(eng_features.to(device))
+            tha_features = tha_sm.encode(tha_words, convert_to_tensor=True)
             tha_features = model(tha_features.to(device))
             loss = criterion(eng_features, tha_features, labels.cuda())
             loss.backward()
@@ -50,8 +50,10 @@ if __name__ == '__main__':
         progbar = tf.keras.utils.Progbar(len(validation_loader),
                                          stateful_metrics=['current_loss'])
         with torch.no_grad():
-            for idx, (eng_features, tha_features, labels) in enumerate(validation_loader):
+            for idx, (eng_words, tha_words, labels) in enumerate(validation_loader):
+                eng_features = eng_sm.encode(eng_words, convert_to_tensor=True)
                 eng_features = model(eng_features.to(device))
+                tha_features = tha_sm.encode(tha_words, convert_to_tensor=True)
                 tha_features = model(tha_features.to(device))
                 loss = criterion(eng_features, tha_features, labels.cuda())
                 progbar.update(idx + 1, [('val_loss', loss.detach().item()),

@@ -307,6 +307,8 @@ class SenteceTokenized(SentenceDataset):
         for sample in batch:
             eng, tha = sample.texts
             meanings.append(eng)
+            splitted_eng = eng.split()
+            tha = tha + ' '.join(np.random.choice(splitted_eng, 1+int(len(splitted_eng)/3)))
             words.append(tha)
             labels.append(sample.label)
         return words, self.tokenizer(meanings, return_tensors='pt', padding=True), torch.tensor(labels)

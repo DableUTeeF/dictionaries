@@ -16,7 +16,7 @@ import sys
 sys.path.extend(['/home/palm/PycharmProjects/sentence-transformers'])
 from sentence_transformers import InputExample
 
-__all__ = ['BertDataset', 'ThaiBertDataset', 'ThaiTokenizer', 'RoyinDataset', 'GPTDataset', 'SentenceDataset']
+__all__ = ['BertDataset', 'ThaiBertDataset', 'ThaiTokenizer', 'RoyinDataset', 'GPTDataset', 'SentenceDataset', 'SenteceTokenized']
 
 
 def convert_to_unicode(text):
@@ -292,6 +292,24 @@ class SentenceDataset(Dataset):
                     break
             out = InputExample(texts=[eng, other_tha], label=0.2)
         return out
+
+
+class SenteceTokenized(SentenceDataset):
+    def __init__(self, tokenizer, language=None, words=None, indices=None, true_only=False):
+        super().__init__(language=language, words=words, indices=indices, true_only=true_only)
+        self.tokenizer = tokenizer
+        self.vocab_size = self.tokenizer.vocab_size
+
+    def collate_fn(self, batch):
+        words = []
+        meanings = []
+        labels = []
+        for sample in batch:
+            eng, tha = sample.texts
+            meanings.append(eng)
+            words.append(tha)
+            labels.append(sample.label)
+        return words, self.tokenizer(meanings, return_tensors='pt', padding=True), torch.tensor(labels)
 
 
 class BertDataset(Dataset):

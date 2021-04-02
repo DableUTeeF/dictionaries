@@ -1,8 +1,4 @@
-"""
-    cp13: 768 2048 768, cosineloss, betas 0.7 0.999,
-    cp14: 768 2048 768, autoencoder, eng->tha
-"""
-from sentence_transformers import SentenceTransformer, InputExample, losses, evaluation
+from sentence_transformers import SentenceTransformer
 from models import *
 from datagen import *
 import torch
@@ -21,21 +17,19 @@ def check_features(features, strings, sm):  # todo: make this more efficient
 
 if __name__ == '__main__':
     device = 'cuda'
-    dataset = SentenceDataset('all', true_only=True)
 
-    tha_sm = SentenceTransformer('/media/palm/BiggerData/dictionaries/cp11-work')
-    tha_sm.requires_grad_(False)
-    tha_sm.train(False)
-    eng_sm = SentenceTransformer('/media/palm/BiggerData/dictionaries/cp10-work')
+    eng_sm = SentenceTransformer('cp10-work')
     eng_sm.requires_grad_(False)
     eng_sm.train(False)
 
-    model = SentenceMatch(768, 2048, 768)
+    dataset = SenteceTokenized(eng_sm.tokenizer, 'eng', true_only=True)
+
+    model = BertAutoEncoderOld(dataset.vocab_size, 768)
     model.to(device)
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, betas=(0.7, 0.999))
     schedule = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=2, min_lr=1e-8, verbose=True)
-    criterion = torch.nn.MSELoss()
+    criterion = torch.nn.CrossEntropyLoss()
 
     train_loader = DataLoader(dataset.train(True), batch_size=16, shuffle=True, collate_fn=dataset.collate_fn)
     validation_loader = DataLoader(dataset.train(False), batch_size=16, shuffle=True, collate_fn=dataset.collate_fn)
@@ -45,12 +39,10 @@ if __name__ == '__main__':
         print('Epoch:', epoch + 1)
         progbar = tf.keras.utils.Progbar(len(train_loader),
                                          stateful_metrics=['current_loss'])
-        for idx, (eng_words, tha_words, labels) in enumerate(train_loader):
-            eng_features, features = check_features(features, eng_words, eng_sm)
-            eng_features = model(eng_features.to(device))
-            tha_features, features = check_features(features, tha_words, tha_sm)
-            # tha_features = model(tha_features.to(device))
-            loss = criterion(eng_features, tha_features)
+        for idx, (words, meanings, labels) in enumerate(train_loader):
+            words, features = check_features(features, words, eng_sm)
+            words_features = model(words.to(device), meanings.to(device))
+            loss = criterion(words_features.transpose(0, 1).transpose(1, 2), meanings.data['input_ids'][:, 1:])
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
@@ -61,12 +53,10 @@ if __name__ == '__main__':
         progbar = tf.keras.utils.Progbar(len(validation_loader),
                                          stateful_metrics=['current_loss'])
         with torch.no_grad():
-            for idx, (eng_words, tha_words, labels) in enumerate(validation_loader):
-                eng_features, features = check_features(features, eng_words, eng_sm)
-                eng_features = model(eng_features.to(device))
-                tha_features, features = check_features(features, tha_words, tha_sm)
-                # tha_features = model(tha_features.to(device))
-                loss = criterion(eng_features, tha_features)
+            for idx, (words, meanings, labels) in enumerate(validation_loader):
+                words, features = check_features(features, words, eng_sm)
+                words_features = model(words.to(device), meanings.to(device))
+                loss = criterion(words_features.transpose(0, 1).transpose(1, 2), meanings.data['input_ids'][:, 1:])
                 progbar.update(idx + 1, [('val_loss', loss.detach().item()),
                                          ('current_loss', loss.detach().item())])
         the_loss = progbar._values['val_loss'][0] / progbar._values['val_loss'][1]

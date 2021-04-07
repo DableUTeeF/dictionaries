@@ -296,12 +296,16 @@ class SentenceDataset(Dataset):
 
 
 class SentenceTokenized(SentenceDataset):
-    def __init__(self, tokenizer, stage, language=None, words=None, indices=None, true_only=False):
+    def __init__(self, tokenizer, stage, language=None, words=None, indices=None, true_only=False, bos='[CLS]', eos='[SEP]'):
         super().__init__(language=language, words=words, indices=indices, true_only=true_only)
         self.tokenizer = tokenizer
         self.vocab_size = self.tokenizer.vocab_size
         self.stage = stage
         self.stops = set(stopwords.words("english"))
+        self.vocab_size = self.tokenizer.vocab_size
+        self.cls = self.tokenizer.vocab[bos]
+        self.sep = self.tokenizer.vocab[eos]
+
 
     def collate_fn(self, batch):
         words = []

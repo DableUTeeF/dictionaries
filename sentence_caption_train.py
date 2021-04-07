@@ -32,6 +32,8 @@ if __name__ == '__main__':
     eng_sm.train(False)
 
     embeddings = copy.deepcopy(eng_sm._first_module().auto_model.embeddings).to(device)
+    embeddings.requires_grad_(False)
+    embeddings.train(True)
     dataset = SentenceTokenized(eng_sm.tokenizer, 'first', language='eng', true_only=True)
 
     model = AEPretrainedEmbedding(dataset.vocab_size, embeddings)

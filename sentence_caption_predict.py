@@ -1,16 +1,37 @@
 from sentence_transformers import SentenceTransformer, InputExample, losses, evaluation
 from datagen import *
 import torch
-if __name__ == '__main__':
-    eng_sm = SentenceTransformer('/media/palm/BiggerData/dictionaries/cp11-work')
-    dataset = SentenceTokenized(eng_sm.tokenizer, 'eng', true_only=True)
-    val_set = dataset.train(False)
+from models import *
+import copy
 
+
+if __name__ == '__main__':
+    device = 'cuda'
+    eng_sm = SentenceTransformer('cp10-work')
+    dataset = SentenceTokenized(eng_sm.tokenizer, 'first', language='eng', true_only=True)
+    val_set = dataset.train(False)
+    embeddings = copy.deepcopy(eng_sm._first_module().auto_model.embeddings).to(device)
+
+    model = AEPretrainedEmbedding(dataset.vocab_size, embeddings).to(device)
+    model.load_state_dict(torch.load('/home/palm/PycharmProjects/nlp/cp14/004_4.3941e-06.pth'))
     with torch.no_grad():
         for data in val_set:
             meaning, word = data.texts
             label = data.label
-            sentence_embeddings = eng_sm.encode(data.texts, convert_to_tensor=True)
-            score = torch.cosine_similarity(sentence_embeddings[0], sentence_embeddings[1], 0)
-            print(meaning, '-', word)
-            print('predict:', score.item(), 'label:', label)
+            memory = eng_sm.encode(word, convert_to_tensor=True).unsqueeze(0)
+            out_indexes = [dataset.cls]
+            for i in range(6):
+                trg_tensor = torch.LongTensor(out_indexes).unsqueeze(1).to(device)
+                output = model.embeddings(trg_tensor)
+                output = model.transformer_decoder(output, memory)
+                output = model.fc(output)
+                out_token = output.argmax(2)[-1].item()
+                # print(torch.max(output, 2)[0])
+                out_indexes.append(out_token)
+                if out_token == dataset.sep:
+                    break
+            print(dataset.tokenizer.decode(meaning.data['input_ids'][0]))
+            print(dataset.tokenizer.decode(out_indexes), dataset.tokenizer.decode(word.data['input_ids'][0]))
+
+            # print(meaning, '-', word)
+            # print('predict:', score.item(), 'label:', label)

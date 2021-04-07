@@ -39,12 +39,13 @@ if __name__ == '__main__':
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, betas=(0.7, 0.999))
     schedule = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=2, min_lr=1e-8, verbose=True)
-    criterion = torch.nn.CrossEntropyLoss()
+    criterion = FocalLoss()
 
     train_loader = DataLoader(dataset.train(True), batch_size=16, shuffle=True, collate_fn=dataset.collate_fn)
     validation_loader = DataLoader(dataset.train(False), batch_size=16, shuffle=True, collate_fn=dataset.collate_fn)
 
     features = {}
+    vocabs = dataset.vocab_size
     for epoch in range(100):
         print('Epoch:', epoch + 1)
         progbar = tf.keras.utils.Progbar(len(train_loader),
@@ -53,6 +54,7 @@ if __name__ == '__main__':
             meanings = meanings.to(device)
             words, features = check_features(features, words, eng_sm)
             words_features = model(words.to(device), meanings)
+            target = torch.nn.functional.one_hot(meanings.data['input_ids'][:, 1:], num_classes=vocabs).float()
             loss = criterion(words_features.transpose(0, 1).transpose(1, 2), meanings.data['input_ids'][:, 1:].to(device))
             loss.backward()
             optimizer.step()
@@ -68,7 +70,8 @@ if __name__ == '__main__':
                 meanings = meanings.to(device)
                 words, features = check_features(features, words, eng_sm)
                 words_features = model(words.to(device), meanings)
-                loss = criterion(words_features.transpose(0, 1).transpose(1, 2), meanings.data['input_ids'][:, 1:])
+                target = torch.nn.functional.one_hot(meanings.data['input_ids'][:, 1:], num_classes=vocabs).float()
+                loss = criterion(words_features.transpose(0, 1).transpose(1, 2), meanings.data['input_ids'][:, 1:].to(device))
                 progbar.update(idx + 1, [('val_loss', loss.detach().item()),
                                          ('current_loss', loss.detach().item())])
         the_loss = progbar._values['val_loss'][0] / progbar._values['val_loss'][1]
@@ -76,5 +79,5 @@ if __name__ == '__main__':
             the_loss = f'{the_loss:.4f}'
         else:
             the_loss = f'{the_loss:.4e}'
-        os.makedirs('/media/palm/BiggerData/dictionaries/cp14', exist_ok=True)
-        torch.save(model.state_dict(), os.path.join("/media/palm/BiggerData/dictionaries/cp14", f"{epoch:03d}_{the_loss}.pth"))
+        os.makedirs(os.path.join(root_data, 'cp14'), exist_ok=True)
+        torch.save(model.state_dict(), os.path.join(root_data, 'cp14', f"{epoch:03d}_{the_loss}.pth"))

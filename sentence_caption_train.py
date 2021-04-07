@@ -55,7 +55,7 @@ if __name__ == '__main__':
             words, features = check_features(features, words, eng_sm)
             words_features = model(words.to(device), meanings)
             target = torch.nn.functional.one_hot(meanings.data['input_ids'][:, 1:], num_classes=vocabs).float()
-            loss = criterion(words_features.transpose(0, 1).transpose(1, 2), meanings.data['input_ids'][:, 1:].to(device))
+            loss = criterion(words_features.transpose(0, 1).transpose(1, 2), target)
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
@@ -71,7 +71,7 @@ if __name__ == '__main__':
                 words, features = check_features(features, words, eng_sm)
                 words_features = model(words.to(device), meanings)
                 target = torch.nn.functional.one_hot(meanings.data['input_ids'][:, 1:], num_classes=vocabs).float()
-                loss = criterion(words_features.transpose(0, 1).transpose(1, 2), meanings.data['input_ids'][:, 1:].to(device))
+                loss = criterion(words_features.transpose(0, 1).transpose(1, 2), target)
                 progbar.update(idx + 1, [('val_loss', loss.detach().item()),
                                          ('current_loss', loss.detach().item())])
         the_loss = progbar._values['val_loss'][0] / progbar._values['val_loss'][1]

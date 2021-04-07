@@ -1,7 +1,7 @@
 from torch.utils.data import Dataset
 from torchtext.vocab import Vocab, Counter
 import torch
-from nltk.corpus import wordnet as wn
+from nltk.corpus import wordnet as wn, stopwords
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data.sampler import SubsetRandomSampler
 import numpy as np
@@ -295,10 +295,12 @@ class SentenceDataset(Dataset):
 
 
 class SenteceTokenized(SentenceDataset):
-    def __init__(self, tokenizer, language=None, words=None, indices=None, true_only=False):
+    def __init__(self, tokenizer, stage, language=None, words=None, indices=None, true_only=False):
         super().__init__(language=language, words=words, indices=indices, true_only=true_only)
         self.tokenizer = tokenizer
         self.vocab_size = self.tokenizer.vocab_size
+        self.stage = stage
+        self.stops = set(stopwords.words("english"))
 
     def collate_fn(self, batch):
         words = []
@@ -306,9 +308,16 @@ class SenteceTokenized(SentenceDataset):
         labels = []
         for sample in batch:
             eng, tha = sample.texts
-            meanings.append(eng)
-            splitted_eng = eng.split()
-            tha = tha + ' '.join(np.random.choice(splitted_eng, 1+int(len(splitted_eng)/3)))
+            if self.stage == 'second':
+                meanings.append(eng)
+            if tha not in self.stops:
+                splitted_eng = [w for w in eng.split() if w not in self.stops]
+            else:
+                splitted_eng = eng.split()
+            if self.stage == 'second':
+                tha = tha + ' '.join(np.random.choice(splitted_eng, 1+int(len(splitted_eng)/3)))
+            else:
+                meanings.append(np.random.choice(splitted_eng, 1+int(len(splitted_eng)/3)))
             words.append(tha)
             labels.append(sample.label)
         return words, self.tokenizer(meanings, return_tensors='pt', padding=True), torch.tensor(labels)

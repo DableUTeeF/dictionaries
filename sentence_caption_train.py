@@ -22,7 +22,7 @@ if __name__ == '__main__':
     eng_sm.requires_grad_(False)
     eng_sm.train(False)
 
-    dataset = SenteceTokenized(eng_sm.tokenizer, 'eng', true_only=True)
+    dataset = SenteceTokenized(eng_sm.tokenizer, 'first', language='eng', true_only=True)
 
     model = BertAutoEncoderOld(dataset.vocab_size, 768)
     model.to(device)

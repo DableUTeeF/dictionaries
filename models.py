@@ -59,7 +59,7 @@ class BertEmbeddings(nn.Module):
 
 
 class FocalLoss(nn.Module):
-    def __init__(self, alpha=1, gamma=2, logits=False, reduce=True):
+    def __init__(self, alpha=1, gamma=2, logits=True, reduce=True):
         super(FocalLoss, self).__init__()
         self.alpha = alpha
         self.gamma = gamma

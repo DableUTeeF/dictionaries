@@ -188,7 +188,7 @@ class AEPretrainedEmbedding(nn.Module):
         decoder_layer = nn.TransformerDecoderLayer(768, 2, 1024, dropout=0.1)
         self.transformer_decoder = nn.TransformerDecoder(decoder_layer, 2)
         self.fc = nn.Linear(768, vocab_size)
-        self.embedding = embedding
+        self.embeddings = embedding
 
     def forward(self, memory, meanings):
         embedded_meanings = self.embeddings(meanings.data['input_ids'][:, :-1].transpose(0, 1))

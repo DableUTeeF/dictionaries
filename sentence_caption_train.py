@@ -4,6 +4,7 @@ from datagen import *
 import torch
 from torch.utils.data import DataLoader
 import tensorflow as tf
+import os
 
 
 def check_features(features, strings, sm):  # todo: make this more efficient
@@ -17,8 +18,15 @@ def check_features(features, strings, sm):  # todo: make this more efficient
 
 if __name__ == '__main__':
     device = 'cuda'
-
-    eng_sm = SentenceTransformer('/media/palm/BiggerData/dictionaries/cp10-work')
+    if os.path.isdir('/media/palm/BiggerData/dictionaries/'):
+        root_data = '/media/palm/BiggerData/dictionaries/'
+    elif os.path.isdir('/home/palm/PycharmProjects/cp10-work/'):
+        root_data = '/home/palm/PycharmProjects/'
+    elif os.path.isdir('/home/palm/PycharmProjects/nlp/cp10-work'):
+        root_data = '/home/palm/PycharmProjects/nlp/'
+    else:
+        raise ValueError('Well, something\'s wrong here')
+    eng_sm = SentenceTransformer(os.path.join(root_data, 'cp10-work'))
     eng_sm.requires_grad_(False)
     eng_sm.train(False)
 

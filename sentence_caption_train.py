@@ -31,7 +31,7 @@ if __name__ == '__main__':
     eng_sm.requires_grad_(False)
     eng_sm.train(False)
 
-    embeddings = copy.deepcopy(eng_sm._first_module().auto_model.embeddings)
+    embeddings = copy.deepcopy(eng_sm._first_module().auto_model.embeddings).to(device)
     dataset = SentenceTokenized(eng_sm.tokenizer, 'first', language='eng', true_only=True)
 
     model = BertAutoEncoder(dataset.vocab_size)
@@ -51,7 +51,7 @@ if __name__ == '__main__':
                                          stateful_metrics=['current_loss'])
         for idx, (words, meanings, labels) in enumerate(train_loader):
             words, features = check_features(features, words, eng_sm)
-            embedded_meanings = embeddings(meanings.data['input_ids'][:, :-1].transpose(0, 1))
+            embedded_meanings = embeddings(meanings.data['input_ids'][:, :-1].transpose(0, 1).to(device))
             words_features = model(words.to(device), embedded_meanings)
             loss = criterion(words_features.transpose(0, 1).transpose(1, 2), meanings.data['input_ids'][:, 1:])
             loss.backward()

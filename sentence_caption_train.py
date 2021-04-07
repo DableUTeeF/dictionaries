@@ -5,6 +5,7 @@ import torch
 from torch.utils.data import DataLoader
 import tensorflow as tf
 import os
+import copy
 
 
 def check_features(features, strings, sm):  # todo: make this more efficient
@@ -30,9 +31,10 @@ if __name__ == '__main__':
     eng_sm.requires_grad_(False)
     eng_sm.train(False)
 
-    dataset = SenteceTokenized(eng_sm.tokenizer, 'first', language='eng', true_only=True)
+    embeddings = copy.deepcopy(eng_sm._first_module().auto_model.embeddings)
+    dataset = SentenceTokenized(eng_sm.tokenizer, 'first', language='eng', true_only=True)
 
-    model = BertAutoEncoderOld(dataset.vocab_size, 768)
+    model = BertAutoEncoder(dataset.vocab_size)
     model.to(device)
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, betas=(0.7, 0.999))
@@ -49,7 +51,8 @@ if __name__ == '__main__':
                                          stateful_metrics=['current_loss'])
         for idx, (words, meanings, labels) in enumerate(train_loader):
             words, features = check_features(features, words, eng_sm)
-            words_features = model(words.to(device), meanings.to(device))
+            embedded_meanings = embeddings(meanings.data['input_ids'][:, :-1].transpose(0, 1))
+            words_features = model(words.to(device), embedded_meanings)
             loss = criterion(words_features.transpose(0, 1).transpose(1, 2), meanings.data['input_ids'][:, 1:])
             loss.backward()
             optimizer.step()

@@ -3,7 +3,7 @@ from datagen import *
 import torch
 if __name__ == '__main__':
     eng_sm = SentenceTransformer('/media/palm/BiggerData/dictionaries/cp11-work')
-    dataset = SenteceTokenized(eng_sm.tokenizer, 'eng', true_only=True)
+    dataset = SentenceTokenized(eng_sm.tokenizer, 'eng', true_only=True)
     val_set = dataset.train(False)
 
     with torch.no_grad():

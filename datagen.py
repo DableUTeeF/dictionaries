@@ -16,7 +16,8 @@ import sys
 sys.path.extend(['/home/palm/PycharmProjects/sentence-transformers'])
 from sentence_transformers import InputExample
 
-__all__ = ['BertDataset', 'ThaiBertDataset', 'ThaiTokenizer', 'RoyinDataset', 'GPTDataset', 'SentenceDataset', 'SenteceTokenized']
+__all__ = ['BertDataset', 'ThaiBertDataset', 'ThaiTokenizer', 'RoyinDataset', 'GPTDataset', 'SentenceDataset',
+           'SentenceTokenized']
 
 
 def convert_to_unicode(text):
@@ -294,7 +295,7 @@ class SentenceDataset(Dataset):
         return out
 
 
-class SenteceTokenized(SentenceDataset):
+class SentenceTokenized(SentenceDataset):
     def __init__(self, tokenizer, stage, language=None, words=None, indices=None, true_only=False):
         super().__init__(language=language, words=words, indices=indices, true_only=true_only)
         self.tokenizer = tokenizer

@@ -18,7 +18,7 @@ def check_features(features, strings, sm):  # todo: make this more efficient
 if __name__ == '__main__':
     device = 'cuda'
 
-    eng_sm = SentenceTransformer('cp10-work')
+    eng_sm = SentenceTransformer('/media/palm/BiggerData/dictionaries/cp10-work')
     eng_sm.requires_grad_(False)
     eng_sm.train(False)
 

@@ -4,7 +4,7 @@ from torch.nn import functional as F
 import math
 
 __all__ = ['BertAutoEncoderWithEmb', 'BertAutoEncoder', 'BertAutoEncoderOld', 'FocalLoss', 'GPTAutoEncoder',
-           'SentenceMatch', 'CosineLoss']
+           'SentenceMatch', 'CosineLoss', 'AEPretrainedEmbedding']
 
 
 class BertEmbeddings(nn.Module):
@@ -180,6 +180,21 @@ class PositionalEncoding(nn.Module):
     def forward(self, x):
         x = x + self.pe[:x.size(0), :]
         return self.dropout(x)
+
+
+class AEPretrainedEmbedding(nn.Module):
+    def __init__(self, vocab_size, embedding):
+        super().__init__()
+        decoder_layer = nn.TransformerDecoderLayer(768, 2, 1024, dropout=0.1)
+        self.transformer_decoder = nn.TransformerDecoder(decoder_layer, 2)
+        self.fc = nn.Linear(768, vocab_size)
+        self.embedding = embedding
+
+    def forward(self, memory, meanings):
+        embedded_meanings = self.embeddings(meanings.data['input_ids'][:, :-1].transpose(0, 1))
+        output = self.transformer_decoder(embedded_meanings, memory)
+        output = self.fc(output)
+        return output
 
 
 class BertAutoEncoder(nn.Module):

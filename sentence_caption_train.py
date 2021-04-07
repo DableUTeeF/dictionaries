@@ -34,7 +34,7 @@ if __name__ == '__main__':
     embeddings = copy.deepcopy(eng_sm._first_module().auto_model.embeddings).to(device)
     dataset = SentenceTokenized(eng_sm.tokenizer, 'first', language='eng', true_only=True)
 
-    model = BertAutoEncoder(dataset.vocab_size)
+    model = AEPretrainedEmbedding(dataset.vocab_size, embeddings)
     model.to(device)
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, betas=(0.7, 0.999))
@@ -50,9 +50,9 @@ if __name__ == '__main__':
         progbar = tf.keras.utils.Progbar(len(train_loader),
                                          stateful_metrics=['current_loss'])
         for idx, (words, meanings, labels) in enumerate(train_loader):
+            meanings = meanings.to(device)
             words, features = check_features(features, words, eng_sm)
-            embedded_meanings = embeddings(meanings.data['input_ids'][:, :-1].transpose(0, 1).to(device))
-            words_features = model(words.to(device), embedded_meanings)
+            words_features = model(words.to(device), meanings)
             loss = criterion(words_features.transpose(0, 1).transpose(1, 2), meanings.data['input_ids'][:, 1:].to(device))
             loss.backward()
             optimizer.step()
@@ -65,8 +65,9 @@ if __name__ == '__main__':
                                          stateful_metrics=['current_loss'])
         with torch.no_grad():
             for idx, (words, meanings, labels) in enumerate(validation_loader):
+                meanings = meanings.to(device)
                 words, features = check_features(features, words, eng_sm)
-                words_features = model(words.to(device), meanings.to(device))
+                words_features = model(words.to(device), meanings)
                 loss = criterion(words_features.transpose(0, 1).transpose(1, 2), meanings.data['input_ids'][:, 1:])
                 progbar.update(idx + 1, [('val_loss', loss.detach().item()),
                                          ('current_loss', loss.detach().item())])

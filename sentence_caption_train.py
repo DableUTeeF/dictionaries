@@ -21,8 +21,8 @@ if __name__ == '__main__':
     device = 'cuda'
     if os.path.isdir('/media/palm/BiggerData/dictionaries/'):
         root_data = '/media/palm/BiggerData/dictionaries/'
-    elif os.path.isdir('/home/palm/PycharmProjects/cp10-work/'):
-        root_data = '/home/palm/PycharmProjects/'
+    elif os.path.isdir('/home/palm/PycharmProjects/cp/cp10-work/'):
+        root_data = '/home/palm/PycharmProjects/cp'
     elif os.path.isdir('/home/palm/PycharmProjects/nlp/cp10-work'):
         root_data = '/home/palm/PycharmProjects/nlp/'
     else:
@@ -76,4 +76,5 @@ if __name__ == '__main__':
             the_loss = f'{the_loss:.4f}'
         else:
             the_loss = f'{the_loss:.4e}'
-        torch.save(model.state_dict(), f"/media/palm/BiggerData/dictionaries/cp14/{epoch:03d}_{the_loss}.pth")
+        os.makedirs('/media/palm/BiggerData/dictionaries/cp14', exist_ok=True)
+        torch.save(model.state_dict(), os.path.join("/media/palm/BiggerData/dictionaries/cp14", f"{epoch:03d}_{the_loss}.pth"))

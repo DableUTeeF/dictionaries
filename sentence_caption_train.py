@@ -53,7 +53,7 @@ if __name__ == '__main__':
             words, features = check_features(features, words, eng_sm)
             embedded_meanings = embeddings(meanings.data['input_ids'][:, :-1].transpose(0, 1).to(device))
             words_features = model(words.to(device), embedded_meanings)
-            loss = criterion(words_features.transpose(0, 1).transpose(1, 2), meanings.data['input_ids'][:, 1:])
+            loss = criterion(words_features.transpose(0, 1).transpose(1, 2), meanings.data['input_ids'][:, 1:].to(device))
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()

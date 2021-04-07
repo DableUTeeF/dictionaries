@@ -317,7 +317,7 @@ class SenteceTokenized(SentenceDataset):
             if self.stage == 'second':
                 tha = tha + ' '.join(np.random.choice(splitted_eng, 1+int(len(splitted_eng)/3)))
             else:
-                meanings.append(' '.join(np.random.choice(splitted_eng, 1+int(len(splitted_eng)/3))))
+                meanings.append(' '.join(splitted_eng[:1+int(len(splitted_eng)/3)]))
             words.append(tha)
             labels.append(sample.label)
         return words, self.tokenizer(meanings, return_tensors='pt', padding=True), torch.tensor(labels)

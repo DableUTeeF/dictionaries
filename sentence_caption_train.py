@@ -39,7 +39,7 @@ if __name__ == '__main__':
     model = AEPretrainedEmbedding(dataset.vocab_size, embeddings)
     model.to(device)
 
-    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, betas=(0.7, 0.999))
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-6, betas=(0.7, 0.999))
     schedule = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=2, min_lr=1e-8, verbose=True)
     criterion = FocalLoss()
 

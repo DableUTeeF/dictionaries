@@ -248,7 +248,18 @@ class SentenceDataset(Dataset):
             word = row.Word1.split(',')[0]
             text = row.Definition
             for pattern in self.patterns:
-                text = re.sub(pattern, '', text)
+                text = re.sub(pattern, '', text).split('เช่น')[0].split(';')[0] # todo: use ; to split between meanings
+            if text.startswith('ดู'):
+                continue
+            if len(text) > 5:
+                if text[2] == ' ':
+                    text = text[3:]
+                elif text[3] == ' ':
+                    text = text[4:]
+                elif text[4] == ' ':
+                    text = text[5:]
+                elif text[5] == ' ':
+                    text = text[6:]
             out_words.append((word, text))
         indices = list(range(len(out_words)))
         return out_words, indices
